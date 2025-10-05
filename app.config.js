@@ -27,13 +27,12 @@ export default {
         backgroundColor: '#1a1a2e',
       },
       package: 'com.meson.mesonradio',
-      versionCode: 1,
       permissions: [
         'INTERNET',
         'FOREGROUND_SERVICE',
         'WAKE_LOCK',
       ],
-      newArchEnabled: false,
+      newArchEnabled: true,
     },
     web: {
       favicon: './assets/favicon.png',
@@ -49,7 +48,7 @@ export default {
     ],
     extra: {
       eas: {
-        projectId: 'your-project-id-here',
+        projectId: 'afb3c6af-1be6-4885-8f79-1414c0a9f7c8',
       },
     },
   },
