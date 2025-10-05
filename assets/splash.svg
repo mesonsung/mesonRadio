@@ -1,0 +1,57 @@
+<svg width="1242" height="2436" viewBox="0 0 1242 2436" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#16213e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a1a2e;stop-opacity:1" />
+    </linearGradient>
+    
+    <radialGradient id="glowGradient" cx="50%" cy="50%">
+      <stop offset="0%" style="stop-color:#06b6d4;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:0" />
+    </radialGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1242" height="2436" fill="url(#bgGradient)"/>
+  
+  <!-- Glow effect -->
+  <circle cx="621" cy="1100" r="500" fill="url(#glowGradient)"/>
+  
+  <!-- Radio waves decoration -->
+  <circle cx="621" cy="1100" r="450" fill="none" stroke="#0e7490" stroke-width="4" opacity="0.2"/>
+  <circle cx="621" cy="1100" r="380" fill="none" stroke="#0e7490" stroke-width="4" opacity="0.3"/>
+  <circle cx="621" cy="1100" r="310" fill="none" stroke="#06b6d4" stroke-width="6" opacity="0.4"/>
+  
+  <!-- Main icon -->
+  <g transform="translate(621, 1100)">
+    <!-- Radio tower/antenna -->
+    <!-- Tower base -->
+    <rect x="-45" y="120" width="90" height="180" fill="#e8e8e8" rx="12"/>
+    
+    <!-- Tower middle -->
+    <polygon points="-45,120 45,120 35,-160 -35,-160" fill="#06b6d4"/>
+    
+    <!-- Antenna tip -->
+    <rect x="-15" y="-220" width="30" height="60" fill="#f59e0b" rx="15"/>
+    <circle cx="0" cy="-220" r="35" fill="#f59e0b"/>
+    
+    <!-- Signal waves (right) -->
+    <path d="M 90 -130 Q 150 -130 180 -100" fill="none" stroke="#f59e0b" stroke-width="18" stroke-linecap="round"/>
+    <path d="M 105 -80 Q 180 -80 220 -40" fill="none" stroke="#f59e0b" stroke-width="18" stroke-linecap="round" opacity="0.7"/>
+    <path d="M 115 -30 Q 210 -30 260 20" fill="none" stroke="#f59e0b" stroke-width="18" stroke-linecap="round" opacity="0.5"/>
+    
+    <!-- Signal waves (left) -->
+    <path d="M -90 -130 Q -150 -130 -180 -100" fill="none" stroke="#f59e0b" stroke-width="18" stroke-linecap="round"/>
+    <path d="M -105 -80 Q -180 -80 -220 -40" fill="none" stroke="#f59e0b" stroke-width="18" stroke-linecap="round" opacity="0.7"/>
+    <path d="M -115 -30 Q -210 -30 -260 20" fill="none" stroke="#f59e0b" stroke-width="18" stroke-linecap="round" opacity="0.5"/>
+  </g>
+  
+  <!-- App name -->
+  <text x="621" y="1500" font-family="Arial, sans-serif" font-size="120" font-weight="bold" fill="#e8e8e8" text-anchor="middle">mesonRadio</text>
+  
+  <!-- Tagline -->
+  <text x="621" y="1620" font-family="Arial, sans-serif" font-size="48" fill="#a0aec0" text-anchor="middle">網路廣播播放器</text>
+  <text x="621" y="1690" font-family="Arial, sans-serif" font-size="48" fill="#a0aec0" text-anchor="middle">Internet Radio Player</text>
+</svg>
+

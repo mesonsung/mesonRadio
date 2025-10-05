@@ -1,0 +1,21 @@
+<svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="48" height="48" fill="#1a1a2e" rx="8"/>
+  
+  <!-- Simple radio tower icon -->
+  <g transform="translate(24, 24)">
+    <!-- Tower -->
+    <polygon points="-4,4 4,4 3,-10 -3,-10" fill="#06b6d4"/>
+    
+    <!-- Base -->
+    <rect x="-3" y="4" width="6" height="8" fill="#e8e8e8" rx="1"/>
+    
+    <!-- Antenna -->
+    <circle cx="0" cy="-12" r="3" fill="#f59e0b"/>
+    
+    <!-- Signal waves -->
+    <path d="M 6 -8 Q 10 -8 12 -6" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M -6 -8 Q -10 -8 -12 -6" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round"/>
+  </g>
+</svg>
+

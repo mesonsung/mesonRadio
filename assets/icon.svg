@@ -1,0 +1,36 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1024" height="1024" fill="#1a1a2e" rx="180"/>
+  
+  <!-- Outer radio wave circle -->
+  <circle cx="512" cy="512" r="380" fill="none" stroke="#0e7490" stroke-width="16" opacity="0.3"/>
+  <circle cx="512" cy="512" r="320" fill="none" stroke="#0e7490" stroke-width="16" opacity="0.5"/>
+  <circle cx="512" cy="512" r="260" fill="none" stroke="#06b6d4" stroke-width="20" opacity="0.7"/>
+  
+  <!-- Radio tower/antenna -->
+  <g transform="translate(512, 512)">
+    <!-- Tower base -->
+    <rect x="-30" y="80" width="60" height="120" fill="#e8e8e8" rx="8"/>
+    
+    <!-- Tower middle -->
+    <polygon points="-30,80 30,80 20,-100 -20,-100" fill="#06b6d4"/>
+    
+    <!-- Antenna tip -->
+    <rect x="-8" y="-140" width="16" height="40" fill="#f59e0b" rx="8"/>
+    <circle cx="0" cy="-140" r="20" fill="#f59e0b"/>
+    
+    <!-- Signal waves (right) -->
+    <path d="M 60 -80 Q 100 -80 120 -60" fill="none" stroke="#f59e0b" stroke-width="12" stroke-linecap="round"/>
+    <path d="M 70 -50 Q 120 -50 145 -25" fill="none" stroke="#f59e0b" stroke-width="12" stroke-linecap="round" opacity="0.7"/>
+    <path d="M 75 -20 Q 135 -20 165 10" fill="none" stroke="#f59e0b" stroke-width="12" stroke-linecap="round" opacity="0.5"/>
+    
+    <!-- Signal waves (left) -->
+    <path d="M -60 -80 Q -100 -80 -120 -60" fill="none" stroke="#f59e0b" stroke-width="12" stroke-linecap="round"/>
+    <path d="M -70 -50 Q -120 -50 -145 -25" fill="none" stroke="#f59e0b" stroke-width="12" stroke-linecap="round" opacity="0.7"/>
+    <path d="M -75 -20 Q -135 -20 -165 10" fill="none" stroke="#f59e0b" stroke-width="12" stroke-linecap="round" opacity="0.5"/>
+  </g>
+  
+  <!-- App name -->
+  <text x="512" y="880" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="#e8e8e8" text-anchor="middle">mesonRadio</text>
+</svg>
+

@@ -1,0 +1,32 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background (will be replaced by adaptive icon background) -->
+  <rect width="1024" height="1024" fill="#1a1a2e"/>
+  
+  <!-- Foreground icon (centered, slightly larger) -->
+  <g transform="translate(512, 512) scale(1.1)">
+    <!-- Radio tower/antenna -->
+    <!-- Tower base -->
+    <rect x="-35" y="90" width="70" height="140" fill="#e8e8e8" rx="10"/>
+    
+    <!-- Tower middle -->
+    <polygon points="-35,90 35,90 25,-120 -25,-120" fill="#06b6d4"/>
+    
+    <!-- Antenna tip -->
+    <rect x="-10" y="-165" width="20" height="45" fill="#f59e0b" rx="10"/>
+    <circle cx="0" cy="-165" r="25" fill="#f59e0b"/>
+    
+    <!-- Signal waves (right) -->
+    <path d="M 70 -100 Q 120 -100 145 -75" fill="none" stroke="#f59e0b" stroke-width="14" stroke-linecap="round"/>
+    <path d="M 80 -60 Q 140 -60 170 -30" fill="none" stroke="#f59e0b" stroke-width="14" stroke-linecap="round" opacity="0.7"/>
+    <path d="M 90 -25 Q 160 -25 195 15" fill="none" stroke="#f59e0b" stroke-width="14" stroke-linecap="round" opacity="0.5"/>
+    
+    <!-- Signal waves (left) -->
+    <path d="M -70 -100 Q -120 -100 -145 -75" fill="none" stroke="#f59e0b" stroke-width="14" stroke-linecap="round"/>
+    <path d="M -80 -60 Q -140 -60 -170 -30" fill="none" stroke="#f59e0b" stroke-width="14" stroke-linecap="round" opacity="0.7"/>
+    <path d="M -90 -25 Q -160 -25 -195 15" fill="none" stroke="#f59e0b" stroke-width="14" stroke-linecap="round" opacity="0.5"/>
+    
+    <!-- Inner glow circle -->
+    <circle cx="0" cy="0" r="280" fill="none" stroke="#06b6d4" stroke-width="20" opacity="0.3"/>
+  </g>
+</svg>
+
