@@ -22,6 +22,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  InteractionManager,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -71,11 +72,22 @@ export const AIAssistantScreen: React.FC<AIAssistantScreenProps> = ({ navigation
       // 頁面進入時
       return () => {
         // 頁面離開時：停止試播
-        if (playingUrl) {
-          AudioPlayerService.stop();
-          setPlayingUrl('');
-        }
-        VoiceCommandService.cleanup();
+        // 使用 InteractionManager 確保在主線程執行
+        InteractionManager.runAfterInteractions(async () => {
+          if (playingUrl) {
+            try {
+              await AudioPlayerService.stop();
+              setPlayingUrl('');
+            } catch (error) {
+              console.error('頁面離開時停止播放失敗:', error);
+            }
+          }
+          try {
+            await VoiceCommandService.cleanup();
+          } catch (error) {
+            console.error('清理語音服務失敗:', error);
+          }
+        });
       };
     }, [playingUrl])
   );
@@ -207,11 +219,29 @@ export const AIAssistantScreen: React.FC<AIAssistantScreenProps> = ({ navigation
   };
 
   // 即時試播/停止
-  const handlePlayPreview = async (station: StationResult) => {
+  const handlePlayPreview = async (station: StationResult, index?: number) => {
     try {
+      // 更新當前電台索引（如果提供了 index）
+      if (index !== undefined) {
+        setCurrentStationIndex(index);
+      } else {
+        // 如果沒有提供 index，從 searchResults 中查找
+        const foundIndex = searchResults.findIndex(s => s.url === station.url);
+        if (foundIndex !== -1) {
+          setCurrentStationIndex(foundIndex);
+        }
+      }
+      
       // 如果正在播放同一個電台，則停止
       if (playingUrl === station.url) {
-        await AudioPlayerService.stop();
+        // 使用 InteractionManager 確保在主線程執行
+        InteractionManager.runAfterInteractions(async () => {
+          try {
+            await AudioPlayerService.stop();
+          } catch (error) {
+            console.error('停止播放失敗:', error);
+          }
+        });
         setPlayingUrl('');
         await VoiceCommandService.speak('已停止播放');
         return;
@@ -232,7 +262,18 @@ export const AIAssistantScreen: React.FC<AIAssistantScreenProps> = ({ navigation
         updatedAt: Date.now(),
       };
       
-      await AudioPlayerService.play(tempStation);
+      // 使用 InteractionManager 確保播放器操作在主線程（UI線程）執行
+      // 這可以避免 "Player is accessed on the wrong thread" 錯誤
+      InteractionManager.runAfterInteractions(async () => {
+        try {
+          await AudioPlayerService.play(tempStation);
+        } catch (error) {
+          console.error('播放器操作失敗:', error);
+          setPlayingUrl('');
+          Alert.alert('播放失敗', '無法播放此電台');
+        }
+      });
+      
       await VoiceCommandService.speak(`正在試播：${station.name}`);
     } catch (error) {
       console.error('播放失敗:', error);
@@ -313,8 +354,7 @@ export const AIAssistantScreen: React.FC<AIAssistantScreenProps> = ({ navigation
       if (action === 'next') {
         if (currentStationIndex < searchResults.length - 1) {
           const nextIndex = currentStationIndex + 1;
-          setCurrentStationIndex(nextIndex);
-          await handlePlayPreview(searchResults[nextIndex]);
+          await handlePlayPreview(searchResults[nextIndex], nextIndex);
         } else {
           await VoiceCommandService.speak('已經是最後一個了');
         }
@@ -324,8 +364,7 @@ export const AIAssistantScreen: React.FC<AIAssistantScreenProps> = ({ navigation
       if (action === 'previous') {
         if (currentStationIndex > 0) {
           const prevIndex = currentStationIndex - 1;
-          setCurrentStationIndex(prevIndex);
-          await handlePlayPreview(searchResults[prevIndex]);
+          await handlePlayPreview(searchResults[prevIndex], prevIndex);
         } else {
           await VoiceCommandService.speak('已經是第一個了');
         }
@@ -340,11 +379,10 @@ export const AIAssistantScreen: React.FC<AIAssistantScreenProps> = ({ navigation
       }
       
       const targetStation = searchResults[targetIndex];
-      setCurrentStationIndex(targetIndex);
       
       switch (action) {
         case 'play':
-          await handlePlayPreview(targetStation);
+          await handlePlayPreview(targetStation, targetIndex);
           break;
         case 'add':
           await handleAddToList(targetStation);
@@ -470,7 +508,7 @@ export const AIAssistantScreen: React.FC<AIAssistantScreenProps> = ({ navigation
         <View style={styles.stationActions}>
           <TouchableOpacity
             style={[styles.actionButton, isPlaying && styles.actionButtonActive]}
-            onPress={() => handlePlayPreview(item)}
+            onPress={() => handlePlayPreview(item, index)}
           >
             <Ionicons
               name={isPlaying ? 'pause' : 'play'}

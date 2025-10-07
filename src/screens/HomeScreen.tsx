@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView, InteractionManager } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { PlayerControls } from '@/components/PlayerControls';
 import { EmptyState } from '@/components/EmptyState';
@@ -61,25 +61,31 @@ export const HomeScreen: React.FC = () => {
   };
 
   const handlePlayPause = async () => {
-    try {
-      if (playbackStatus === PlaybackStatus.PLAYING) {
-        await AudioPlayerService.pause();
-      } else if (playbackStatus === PlaybackStatus.PAUSED) {
-        await AudioPlayerService.resume();
-      } else if (currentStation) {
-        await AudioPlayerService.play(currentStation);
+    // 使用 InteractionManager 確保在主線程執行，避免線程錯誤
+    InteractionManager.runAfterInteractions(async () => {
+      try {
+        if (playbackStatus === PlaybackStatus.PLAYING) {
+          await AudioPlayerService.pause();
+        } else if (playbackStatus === PlaybackStatus.PAUSED) {
+          await AudioPlayerService.resume();
+        } else if (currentStation) {
+          await AudioPlayerService.play(currentStation);
+        }
+      } catch (error) {
+        console.error('Error toggling playback:', error);
       }
-    } catch (error) {
-      console.error('Error toggling playback:', error);
-    }
+    });
   };
 
   const handleStop = async () => {
-    try {
-      await AudioPlayerService.stop();
-    } catch (error) {
-      console.error('Error stopping playback:', error);
-    }
+    // 使用 InteractionManager 確保在主線程執行，避免線程錯誤
+    InteractionManager.runAfterInteractions(async () => {
+      try {
+        await AudioPlayerService.stop();
+      } catch (error) {
+        console.error('Error stopping playback:', error);
+      }
+    });
   };
 
   const handlePrevious = async () => {
@@ -96,7 +102,15 @@ export const HomeScreen: React.FC = () => {
       const previousStation = favoriteStations[previousIndex];
       setCurrentStation(previousStation);
       await StorageManager.setCurrentStation(previousStation);
-      await AudioPlayerService.play(previousStation);
+      
+      // 使用 InteractionManager 確保在主線程執行
+      InteractionManager.runAfterInteractions(async () => {
+        try {
+          await AudioPlayerService.play(previousStation);
+        } catch (error) {
+          console.error('Error playing station:', error);
+        }
+      });
     } catch (error) {
       console.error('Error playing previous station:', error);
     }
@@ -116,7 +130,15 @@ export const HomeScreen: React.FC = () => {
       const nextStation = favoriteStations[nextIndex];
       setCurrentStation(nextStation);
       await StorageManager.setCurrentStation(nextStation);
-      await AudioPlayerService.play(nextStation);
+      
+      // 使用 InteractionManager 確保在主線程執行
+      InteractionManager.runAfterInteractions(async () => {
+        try {
+          await AudioPlayerService.play(nextStation);
+        } catch (error) {
+          console.error('Error playing station:', error);
+        }
+      });
     } catch (error) {
       console.error('Error playing next station:', error);
     }
