@@ -27,6 +27,26 @@ export const Config = {
     shouldCorrectPitch: true,
     volume: 1.0,
     rate: 1.0,
+    // 啟用漸進式下載和緩衝
+    progressUpdateIntervalMillis: 500, // 緩衝狀態更新間隔
+  },
+  
+  // Buffer settings (緩衝設定)
+  BUFFER_CONFIG: {
+    // Android 特定緩衝配置
+    androidImplementation: 'MediaPlayer', // 或 'SimpleExoPlayer'
+    // 緩衝策略
+    preferredForwardBufferDuration: 5000, // 前向緩衝 5 秒
+    // 狀態更新頻率
+    progressUpdateInterval: 500, // 500ms 更新一次緩衝狀態
+  },
+  
+  // Network retry settings
+  NETWORK_RETRY: {
+    maxAttemptsPerRequest: 3, // 每次請求的網路重試次數
+    retryDelayBase: 500, // 基礎重試延遲（毫秒）
+    streamRetryInterval: 3000, // 串流重試固定間隔（毫秒）- 每 3 秒一次
+    enableInfiniteRetry: true, // 啟用無限重試
   },
 };
 

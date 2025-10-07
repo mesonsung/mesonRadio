@@ -16,8 +16,10 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { RadioBrowserService } from '@/services/RadioBrowserService';
 import { SmartSearchService } from '@/services/SmartSearchService';
+import { AIRadioSearchService } from '@/services/AIRadioSearchService';
 import { StorageManager } from '@/utils/StorageManager';
 import { SearchResult } from '@/models/Station';
 import { Colors, Spacing, BorderRadius, FontSizes, IconSizes } from '@/constants/theme';
@@ -48,20 +50,41 @@ export const SearchStationsScreen: React.FC<SearchStationsScreenProps> = ({ navi
     try {
       let searchQuery = query.trim();
       
-      // 如果啟用 AI，先讓 AI 理解並轉換查詢
+      // 如果啟用 AI，使用 AI 從網路搜尋電台（新功能！）
       if (useAI && SmartSearchService.hasAIEnabled()) {
         try {
-          const aiOptimizedQuery = await optimizeSearchWithAI(searchQuery);
-          if (aiOptimizedQuery) {
-            searchQuery = aiOptimizedQuery;
-            setAiSuggestion(`🤖 AI 建議搜尋：${aiOptimizedQuery}`);
+          setAiSuggestion('🤖 AI 正在為您搜尋網路電台...');
+          
+          const aiResults = await AIRadioSearchService.searchRadioStationsWithAI(searchQuery);
+          
+          if (aiResults.length > 0) {
+            // 將 AI 搜尋結果轉換為 SearchResult 格式
+            const searchResults = aiResults.map(station => ({
+              id: station.url,
+              name: station.name,
+              url: station.url,
+              favicon: station.favicon || '',
+              country: station.country,
+              language: station.language,
+              tags: station.genre,
+              votes: 0,
+              bitrate: station.bitrate || 'unknown',
+            }));
+            
+            setResults(searchResults);
+            setSelectedStations(new Set());
+            setAiSuggestion(`🤖 AI 為您找到 ${searchResults.length} 個推薦電台`);
+            return;
+          } else {
+            setAiSuggestion('🤖 AI 搜尋無結果，使用傳統搜尋...');
           }
         } catch (error) {
-          console.error('AI optimization failed, using original query:', error);
+          console.error('AI search failed:', error);
+          setAiSuggestion('⚠️ AI 搜尋失敗，使用傳統搜尋');
         }
       }
       
-      // 使用優化後的查詢搜尋電台
+      // 使用傳統的 Radio Browser 搜尋
       const searchResults = await RadioBrowserService.searchStations(searchQuery);
       setResults(searchResults);
       setSelectedStations(new Set());
@@ -82,7 +105,6 @@ export const SearchStationsScreen: React.FC<SearchStationsScreenProps> = ({ navi
       if (!apiKey) return null;
 
       // 使用 Gemini 優化搜尋關鍵字
-      const { GoogleGenerativeAI } = await import('@google/generative-ai');
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 

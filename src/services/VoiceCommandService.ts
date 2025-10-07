@@ -9,8 +9,10 @@
  */
 
 import * as Speech from 'expo-speech';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { SmartSearchService, AIProvider } from './SmartSearchService';
 import { RadioBrowserService } from './RadioBrowserService';
+import { AIRadioSearchService } from './AIRadioSearchService';
 import { AudioPlayerService } from './AudioPlayerService';
 import { StorageManager } from '@/utils/StorageManager';
 import { Station } from '@/models/Station';
@@ -73,7 +75,7 @@ export class VoiceCommandService {
   }
 
   /**
-   * 處理語音命令 - 返回搜尋結果列表
+   * 處理語音命令 - 使用 AI 從網路搜尋電台
    */
   static async processVoiceCommand(command: string): Promise<VoiceCommandResult> {
     try {
@@ -87,19 +89,31 @@ export class VoiceCommandService {
         };
       }
 
-      // 先嘗試從本地預設電台搜尋
-      const localStations = await this.searchLocalStations(analysis.keyword, analysis.description);
+      // 使用 AI 從網路搜尋電台（新功能！）
+      console.log(`使用 AI 搜尋網路電台：${analysis.description}`);
+      const aiResults = await AIRadioSearchService.searchRadioStationsWithAI(analysis.description);
       
-      if (localStations.length > 0) {
+      if (aiResults.length > 0) {
+        const stations = aiResults.map(station => ({
+          name: station.name,
+          url: station.url,
+          favicon: station.favicon || '',
+          country: station.country,
+          tags: station.genre,
+        }));
+        
         return {
           success: true,
-          message: `找到 ${localStations.length} 個「${analysis.description}」電台`,
-          stations: localStations,
+          message: `🤖 AI 為您找到 ${stations.length} 個「${analysis.description}」電台`,
+          stations,
           query: analysis.description,
         };
       }
 
-      // 如果本地沒有，再嘗試 Radio Browser API
+      // 如果 AI 搜尋沒有結果，降級到傳統搜尋
+      console.log('AI 搜尋無結果，使用傳統搜尋');
+      
+      // 嘗試 Radio Browser API
       try {
         const searchResults = await RadioBrowserService.searchStations(analysis.keyword);
         
@@ -217,7 +231,6 @@ export class VoiceCommandService {
         throw new Error('未配置 AI API Key');
       }
 
-      const { GoogleGenerativeAI } = await import('@google/generative-ai');
       const genAI = new GoogleGenerativeAI(apiKey);
       
       // 使用最新的 Gemini 2.5 Flash 模型（快速且強大）

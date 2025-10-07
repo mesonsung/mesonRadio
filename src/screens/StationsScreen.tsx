@@ -13,6 +13,7 @@ import {
   Alert,
   TextInput,
   ActivityIndicator,
+  InteractionManager,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -144,9 +145,17 @@ export const StationsScreen: React.FC<StationsScreenProps> = ({ navigation }) =>
 
   const handleStationPress = async (station: Station) => {
     try {
-      await AudioPlayerService.play(station);
       await StorageManager.setCurrentStation(station);
       setCurrentStation(station);
+      
+      // 使用 InteractionManager 確保在主線程執行，避免線程錯誤
+      InteractionManager.runAfterInteractions(async () => {
+        try {
+          await AudioPlayerService.play(station);
+        } catch (error) {
+          Alert.alert(t('common.error'), t('player.errorMessage'));
+        }
+      });
     } catch (error) {
       Alert.alert(t('common.error'), t('player.errorMessage'));
     }
