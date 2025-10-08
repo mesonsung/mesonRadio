@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, InteractionManager } from 'react-native';
+import { View, StyleSheet, ScrollView, RefreshControl, InteractionManager } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { PlayerControls } from '@/components/PlayerControls';
 import { EmptyState } from '@/components/EmptyState';
@@ -19,6 +19,7 @@ export const HomeScreen: React.FC = () => {
   const [currentStation, setCurrentStation] = useState<Station | null>(null);
   const [playbackStatus, setPlaybackStatus] = useState<PlaybackStatus>(PlaybackStatus.IDLE);
   const [favoriteStations, setFavoriteStations] = useState<Station[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     initializePlayer();
@@ -58,6 +59,12 @@ export const HomeScreen: React.FC = () => {
 
   const handleStatusChange = (status: PlaybackStatus) => {
     setPlaybackStatus(status);
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
   };
 
   const handlePlayPause = async () => {
@@ -150,6 +157,14 @@ export const HomeScreen: React.FC = () => {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollViewContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[Colors.primary]}
+            tintColor={Colors.primary}
+          />
+        }
       >
         <PlayerControls
           status={playbackStatus}

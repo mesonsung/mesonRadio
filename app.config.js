@@ -30,7 +30,11 @@ export default {
       permissions: [
         'INTERNET',
         'FOREGROUND_SERVICE',
+        'FOREGROUND_SERVICE_MEDIA_PLAYBACK',
         'WAKE_LOCK',
+        'ACCESS_NETWORK_STATE',
+        'RECEIVE_BOOT_COMPLETED',
+        'POST_NOTIFICATIONS',
       ],
       newArchEnabled: true,
     },
@@ -45,6 +49,21 @@ export default {
         },
       ],
       'expo-localization',
+      [
+        'expo-notifications',
+        {
+          icon: './assets/icon.png',
+          color: '#1a1a2e',
+          sounds: [],
+        },
+      ],
+      [
+        'expo-background-fetch',
+        {
+          minimumInterval: 15,
+        },
+      ],
+      'expo-task-manager',
     ],
     extra: {
       eas: {
