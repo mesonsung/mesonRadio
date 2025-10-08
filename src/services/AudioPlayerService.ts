@@ -31,6 +31,8 @@ export class AudioPlayerService {
   private static bufferingTimeoutId: NodeJS.Timeout | null = null; // 緩衝超時計時器
   private static lastPlayingTime: number = 0; // 上次播放時間
   private static bufferingCheckInterval: NodeJS.Timeout | null = null; // 緩衝檢查計時器
+  private static lastNotificationStatus: string = ''; // 追踪上次通知状态
+  private static notificationUpdateTimer: NodeJS.Timeout | null = null; // 防抖计时器
 
   /**
    * 初始化音訊系統
@@ -293,13 +295,20 @@ export class AudioPlayerService {
     this.clearBufferingTimeout();
     this.clearBufferingCheck();
     
-    // 停用保持喚醒
-    try {
-      deactivateKeepAwake('audio-playback');
-      console.log('✅ Keep Awake 已停用');
-    } catch (error) {
-      console.warn('⚠️ Keep Awake 停用失敗:', error);
-    }
+      // 清除防抖計時器
+      if (this.notificationUpdateTimer) {
+        clearTimeout(this.notificationUpdateTimer);
+        this.notificationUpdateTimer = null;
+      }
+      this.lastNotificationStatus = '';
+
+      // 停用保持喚醒
+      try {
+        deactivateKeepAwake('audio-playback');
+        console.log('✅ Keep Awake 已停用');
+      } catch (error) {
+        console.warn('⚠️ Keep Awake 停用失敗:', error);
+      }
     
     // 隱藏媒體通知
     await MediaNotificationService.hideNotification();
@@ -391,10 +400,8 @@ export class AudioPlayerService {
         this.lastPlayingTime = Date.now();
         this.notifyStatus(PlaybackStatus.PLAYING);
         
-        // 更新通知狀態
-        if (this.currentStation) {
-          MediaNotificationService.updateNotification(this.currentStation, 'playing').catch(console.error);
-        }
+        // 更新通知狀態（使用防抖，避免頻繁更新）
+        this.updateNotificationDebounced('playing');
       } else if (status.isBuffering) {
         // Native 緩衝區需要更多數據
         if (!this.isBuffering) {
@@ -405,10 +412,9 @@ export class AudioPlayerService {
         }
         this.notifyStatus(PlaybackStatus.BUFFERING);
         
-        // 更新通知狀態
-        if (this.currentStation) {
-          MediaNotificationService.updateNotification(this.currentStation, 'buffering').catch(console.error);
-        }
+        // 緩衝狀態不更新通知（避免頻繁閃爍）
+        // 只在長時間緩衝時才更新
+        // this.updateNotificationDebounced('buffering');
       } else if (status.didJustFinish) {
         // 串流結束，嘗試重連
         console.log('📡 Stream finished, attempting to reconnect...');
@@ -420,6 +426,32 @@ export class AudioPlayerService {
       console.error('Playback error:', status.error);
       this.handlePlaybackError(new Error(status.error));
     }
+  }
+
+  /**
+   * 防抖更新通知
+   * Debounced notification update
+   */
+  private static updateNotificationDebounced(status: string): void {
+    // 如果狀態未改變，不更新
+    if (status === this.lastNotificationStatus) {
+      return;
+    }
+
+    // 清除之前的計時器
+    if (this.notificationUpdateTimer) {
+      clearTimeout(this.notificationUpdateTimer);
+    }
+
+    // 設置新的計時器（500ms 防抖）
+    this.notificationUpdateTimer = setTimeout(() => {
+      if (this.currentStation && status !== this.lastNotificationStatus) {
+        this.lastNotificationStatus = status;
+        MediaNotificationService.updateNotification(this.currentStation, status)
+          .catch(console.error);
+      }
+      this.notificationUpdateTimer = null;
+    }, 500); // 500ms 防抖延遲
   }
 
   /**
@@ -561,6 +593,13 @@ export class AudioPlayerService {
       this.clearRetryTimeout();
       this.clearBufferingTimeout();
       this.clearBufferingCheck();
+      
+      // 清除防抖計時器
+      if (this.notificationUpdateTimer) {
+        clearTimeout(this.notificationUpdateTimer);
+        this.notificationUpdateTimer = null;
+      }
+      this.lastNotificationStatus = '';
       
       // 停用保持喚醒
       try {
