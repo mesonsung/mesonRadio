@@ -152,6 +152,13 @@ android {
     }
 }
 
+// 排除旧的 Support 库，避免与 AndroidX 冲突
+configurations.all {
+    exclude group: 'com.android.support', module: 'support-compat'
+    exclude group: 'com.android.support', module: 'support-v4'
+    exclude group: 'com.android.support', module: 'versionedparcelable'
+}
+
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")

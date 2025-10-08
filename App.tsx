@@ -6,7 +6,8 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, AppState } from 'react-native';
+import { KeepAwake } from 'expo-keep-awake';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { initializeI18n } from './src/utils/i18n';
 import { AudioPlayerService } from './src/services/AudioPlayerService';
@@ -16,9 +17,29 @@ import { Colors } from './src/constants/theme';
 
 export default function App() {
   const [isReady, setIsReady] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
     initializeApp();
+
+    // 監聽應用狀態變化
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      console.log('📱 App State changed:', nextAppState);
+      
+      // 檢查播放狀態
+      const playing = AudioPlayerService.getIsPlaying();
+      setIsPlaying(playing);
+      
+      if (nextAppState === 'background' && playing) {
+        console.log('📱 App 進入後台，保持播放');
+      } else if (nextAppState === 'active' && playing) {
+        console.log('📱 App 返回前台，繼續播放');
+      }
+    });
+
+    return () => {
+      subscription?.remove();
+    };
   }, []);
 
   const initializeApp = async () => {
@@ -53,6 +74,8 @@ export default function App() {
   return (
     <>
       <StatusBar style="light" />
+      {/* 當播放時保持喚醒 */}
+      {isPlaying && <KeepAwake />}
       <AppNavigator />
     </>
   );

@@ -14,6 +14,7 @@ import { PlaybackStatus } from '@/models/PlayerState';
 import { Config } from '@/constants/config';
 import { MediaNotificationService } from './MediaNotificationService';
 import { BackgroundTaskService } from './BackgroundTaskService';
+import { ForegroundService } from './ForegroundService';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 
 export class AudioPlayerService {
@@ -33,6 +34,8 @@ export class AudioPlayerService {
   private static bufferingCheckInterval: NodeJS.Timeout | null = null; // 緩衝檢查計時器
   private static lastNotificationStatus: string = ''; // 追踪上次通知状态
   private static notificationUpdateTimer: NodeJS.Timeout | null = null; // 防抖计时器
+  private static healthCheckInterval: NodeJS.Timeout | null = null; // 健康檢查計時器
+  private static lastHealthCheckTime: number = 0; // 上次健康檢查時間
 
   /**
    * 初始化音訊系統
@@ -43,15 +46,17 @@ export class AudioPlayerService {
       // 初始化音訊系統 - 配置屏幕關閉時繼續播放
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
-        staysActiveInBackground: true,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
-        // Android 中斷模式：不暫停播放
-        interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
-        // iOS 中斷模式：混音或繼續播放
-        interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+        staysActiveInBackground: true,        // ⭐ 關鍵：後台繼續播放
+        playsInSilentModeIOS: true,           // iOS 靜音模式下播放
+        shouldDuckAndroid: false,              // Android 不降低其他音訊
+        playThroughEarpieceAndroid: false,    // 不使用聽筒播放
+        // Android 中斷模式：降低其他音訊音量（更穩定）
+        interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
+        // iOS 中斷模式：降低其他音訊音量
+        interruptionModeIOS: InterruptionModeIOS.DuckOthers,
       });
+      
+      console.log('✅ 音訊模式已配置（後台播放、屏幕關閉播放）');
 
       // 初始化媒體通知服務
       await MediaNotificationService.initialize();
@@ -191,16 +196,33 @@ export class AudioPlayerService {
         );
 
         this.sound = sound;
-        await sound.playAsync();
-        console.log('Stream playing successfully');
         
-        // 激活保持喚醒（防止屏幕關閉時停止播放）
+        // 設置音頻會話為活躍狀態
+        await sound.setStatusAsync({
+          shouldPlay: true,
+          volume: Config.DEFAULT_VOLUME,
+        });
+        
+        await sound.playAsync();
+        console.log('✅ 流媒體播放成功');
+
+        // ⭐ 關鍵：激活保持喚醒（防止屏幕關閉時停止播放）
         try {
           await activateKeepAwakeAsync('audio-playback');
           console.log('✅ Keep Awake 已激活（屏幕關閉時繼續播放）');
         } catch (error) {
           console.warn('⚠️ Keep Awake 激活失敗:', error);
         }
+
+        // ⭐⭐⭐ 啟動前台服務（最強保護）
+        try {
+          await ForegroundService.start(this.currentStation?.name || 'mesonRadio');
+        } catch (error) {
+          console.warn('⚠️ 前台服務啟動失敗:', error);
+        }
+
+        // 啟動健康檢查
+        this.startHealthCheck();
         
         // 顯示媒體通知
         if (this.currentStation) {
@@ -294,6 +316,7 @@ export class AudioPlayerService {
     this.clearRetryTimeout();
     this.clearBufferingTimeout();
     this.clearBufferingCheck();
+    this.stopHealthCheck(); // 停止健康檢查
     
       // 清除防抖計時器
       if (this.notificationUpdateTimer) {
@@ -308,6 +331,13 @@ export class AudioPlayerService {
         console.log('✅ Keep Awake 已停用');
       } catch (error) {
         console.warn('⚠️ Keep Awake 停用失敗:', error);
+      }
+
+      // ⭐⭐⭐ 停止前台服務
+      try {
+        await ForegroundService.stop();
+      } catch (error) {
+        console.warn('⚠️ 前台服務停止失敗:', error);
       }
     
     // 隱藏媒體通知
@@ -528,6 +558,77 @@ export class AudioPlayerService {
   }
 
   /**
+   * 啟動健康檢查
+   * Start health check - 定期檢查播放狀態並自動恢復
+   */
+  private static startHealthCheck(): void {
+    // 清除之前的健康檢查
+    this.stopHealthCheck();
+    
+    console.log('🏥 啟動播放健康檢查（每30秒）');
+    
+    this.lastHealthCheckTime = Date.now();
+    
+    this.healthCheckInterval = setInterval(async () => {
+      try {
+        const now = Date.now();
+        
+        // 如果應該播放但實際沒有在播放
+        if (this.shouldKeepPlaying && !this.isUserStopped) {
+          // 檢查是否有 sound 實例
+          if (!this.sound) {
+            console.warn('⚠️ 健康檢查: sound 實例不存在，嘗試恢復...');
+            await this.startPlayback();
+            this.lastHealthCheckTime = now;
+            return;
+          }
+          
+          // 檢查播放狀態
+          try {
+            const status = await this.sound.getStatusAsync();
+            
+            if (!status.isLoaded) {
+              console.warn('⚠️ 健康檢查: sound 未加載，嘗試恢復...');
+              await this.startPlayback();
+            } else if (!status.isPlaying && !status.isBuffering && this.shouldKeepPlaying) {
+              console.warn('⚠️ 健康檢查: 應該播放但已停止，嘗試恢復...');
+              // 檢查是否長時間未播放（超過1分鐘）
+              const timeSinceLastPlaying = this.lastPlayingTime > 0 ? now - this.lastPlayingTime : 0;
+              if (timeSinceLastPlaying > 60000) {
+                console.warn(`⚠️ 已停止播放 ${Math.floor(timeSinceLastPlaying / 1000)} 秒，強制恢復`);
+                await this.startPlayback();
+              }
+            } else if (status.isPlaying) {
+              // 播放正常，更新最後播放時間
+              this.lastPlayingTime = now;
+            }
+          } catch (statusError) {
+            console.error('❌ 健康檢查: 獲取狀態失敗', statusError);
+            // 如果無法獲取狀態，可能 sound 實例已損壞，嘗試重新創建
+            await this.startPlayback();
+          }
+        }
+        
+        this.lastHealthCheckTime = now;
+      } catch (error) {
+        console.error('❌ 健康檢查出錯:', error);
+      }
+    }, 30000); // 每30秒檢查一次
+  }
+
+  /**
+   * 停止健康檢查
+   * Stop health check
+   */
+  private static stopHealthCheck(): void {
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+      console.log('🏥 健康檢查已停止');
+    }
+  }
+
+  /**
    * 啟動定期緩衝檢查
    * Start periodic buffering check
    */
@@ -593,6 +694,7 @@ export class AudioPlayerService {
       this.clearRetryTimeout();
       this.clearBufferingTimeout();
       this.clearBufferingCheck();
+      this.stopHealthCheck(); // 停止健康檢查
       
       // 清除防抖計時器
       if (this.notificationUpdateTimer) {
