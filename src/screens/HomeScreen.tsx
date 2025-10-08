@@ -31,7 +31,7 @@ export const HomeScreen: React.FC = () => {
     // 不需要 cleanup - 讓播放器在後台繼續運行
     return () => {
       // 只清除狀態回調，不停止播放
-      AudioPlayerService.setStatusCallback(() => {});
+      TrackPlayerService.setStatusCallback(() => {});
     };
   }, []);
 
@@ -112,7 +112,7 @@ export const HomeScreen: React.FC = () => {
       // 使用 InteractionManager 確保在主線程執行
       InteractionManager.runAfterInteractions(async () => {
         try {
-          await AudioPlayerService.play(previousStation);
+          await TrackPlayerService.play(previousStation);
         } catch (error) {
           console.error('Error playing station:', error);
         }
@@ -140,7 +140,7 @@ export const HomeScreen: React.FC = () => {
       // 使用 InteractionManager 確保在主線程執行
       InteractionManager.runAfterInteractions(async () => {
         try {
-          await AudioPlayerService.play(nextStation);
+          await TrackPlayerService.play(nextStation);
         } catch (error) {
           console.error('Error playing station:', error);
         }

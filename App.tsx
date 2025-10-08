@@ -7,7 +7,7 @@ import 'react-native-gesture-handler';
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet, AppState } from 'react-native';
-import { KeepAwake } from 'expo-keep-awake';
+import { useKeepAwake } from 'expo-keep-awake';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { initializeI18n } from './src/utils/i18n';
 import { AudioPlayerService } from './src/services/AudioPlayerService';
@@ -18,6 +18,9 @@ import { Colors } from './src/constants/theme';
 export default function App() {
   const [isReady, setIsReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+
+  // 當播放時保持喚醒
+  useKeepAwake('audio-playback', { suppressDeactivateWarnings: true });
 
   useEffect(() => {
     initializeApp();
@@ -74,8 +77,6 @@ export default function App() {
   return (
     <>
       <StatusBar style="light" />
-      {/* 當播放時保持喚醒 */}
-      {isPlaying && <KeepAwake />}
       <AppNavigator />
     </>
   );
