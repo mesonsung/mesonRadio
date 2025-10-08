@@ -33,5 +33,12 @@
         <category android:name="android.intent.category.LAUNCHER"/>
       </intent-filter>
     </activity>
+    <!-- 音頻前台服務 - 確保鎖屏後不被殺掉 -->
+    <service
+      android:name=".AudioForegroundService"
+      android:enabled="true"
+      android:exported="false"
+      android:foregroundServiceType="mediaPlayback"
+      android:stopWithTask="false" />
   </application>
 </manifest>

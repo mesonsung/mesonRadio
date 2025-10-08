@@ -22,10 +22,16 @@ export const HomeScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    initializePlayer();
+    // 只設置狀態回調，不重複初始化（App.tsx 已初始化）
+    AudioPlayerService.setStatusCallback(handleStatusChange);
+    
+    // 載入初始數據
+    loadData();
 
+    // 不需要 cleanup - 讓播放器在後台繼續運行
     return () => {
-      AudioPlayerService.cleanup();
+      // 只清除狀態回調，不停止播放
+      AudioPlayerService.setStatusCallback(() => {});
     };
   }, []);
 
@@ -36,14 +42,7 @@ export const HomeScreen: React.FC = () => {
     }, [])
   );
 
-  const initializePlayer = async () => {
-    try {
-      await AudioPlayerService.initialize();
-      AudioPlayerService.setStatusCallback(handleStatusChange);
-    } catch (error) {
-      console.error('Error initializing player:', error);
-    }
-  };
+  // 移除 initializePlayer - 不需要在這裡重複初始化
 
   const loadData = async () => {
     try {

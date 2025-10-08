@@ -45,15 +45,15 @@ export class MediaNotificationService {
         return;
       }
 
-      // Android: 創建通知頻道（高優先級，保持前台服務）
+      // Android: 創建通知頻道（最高優先級，模擬前台服務）
       if (Platform.OS === 'android') {
         await Notifications.setNotificationChannelAsync(this.channelId, {
           name: '媒體播放',
-          importance: Notifications.AndroidImportance.HIGH,
+          importance: Notifications.AndroidImportance.MAX, // ⭐ 改為 MAX
           sound: null, // 不播放聲音
           vibrationPattern: null, // 不震動
           lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-          bypassDnd: false,
+          bypassDnd: true, // ⭐ 允許繞過勿擾模式
           enableLights: false,
           enableVibrate: false,
           showBadge: false,
@@ -82,18 +82,19 @@ export class MediaNotificationService {
           isPlaying,
         },
         priority: Platform.OS === 'android' 
-          ? Notifications.AndroidNotificationPriority.HIGH 
+          ? Notifications.AndroidNotificationPriority.MAX // ⭐ 改為 MAX
           : undefined,
         sound: null,
         vibrate: [],
         badge: 0,
         categoryIdentifier: 'media-control',
         ...(Platform.OS === 'android' && {
-          // Android 特定配置
-          sticky: true, // 無法滑動移除（保持前台服務）
-          ongoing: true, // 持續通知
-          autoCancel: false, // 點擊不自動取消
+          // Android 特定配置 - 模擬前台服務行為
+          sticky: true,        // ⭐ 無法滑動移除
+          ongoing: true,       // ⭐ 持續通知（類似前台服務）
+          autoCancel: false,   // ⭐ 點擊不自動取消
           channelId: this.channelId,
+          color: '#1a1a2e',    // 通知顏色
         }),
       };
 
