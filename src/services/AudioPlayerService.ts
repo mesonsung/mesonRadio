@@ -8,10 +8,13 @@
  * - 持續播放直到使用者停止
  */
 
-import { Audio, AVPlaybackStatus } from 'expo-av';
+import { Audio, AVPlaybackStatus, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
 import { Station } from '@/models/Station';
 import { PlaybackStatus } from '@/models/PlayerState';
 import { Config } from '@/constants/config';
+import { MediaNotificationService } from './MediaNotificationService';
+import { BackgroundTaskService } from './BackgroundTaskService';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 
 export class AudioPlayerService {
   private static sound: Audio.Sound | null = null;
@@ -24,6 +27,10 @@ export class AudioPlayerService {
   private static isUserStopped: boolean = false; // 是否由使用者停止
   private static isBuffering: boolean = false; // 是否正在緩衝
   private static lastBufferUpdate: number = 0; // 上次緩衝更新時間
+  private static bufferingStartTime: number = 0; // 緩衝開始時間
+  private static bufferingTimeoutId: NodeJS.Timeout | null = null; // 緩衝超時計時器
+  private static lastPlayingTime: number = 0; // 上次播放時間
+  private static bufferingCheckInterval: NodeJS.Timeout | null = null; // 緩衝檢查計時器
 
   /**
    * 初始化音訊系統
@@ -31,13 +38,37 @@ export class AudioPlayerService {
    */
   static async initialize(): Promise<void> {
     try {
+      // 初始化音訊系統 - 配置屏幕關閉時繼續播放
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
         staysActiveInBackground: true,
         playsInSilentModeIOS: true,
         shouldDuckAndroid: true,
         playThroughEarpieceAndroid: false,
+        // Android 中斷模式：不暫停播放
+        interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+        // iOS 中斷模式：混音或繼續播放
+        interruptionModeIOS: InterruptionModeIOS.DoNotMix,
       });
+
+      // 初始化媒體通知服務
+      await MediaNotificationService.initialize();
+
+      // 初始化後台任務服務
+      await BackgroundTaskService.initialize();
+
+      // 設置網路狀態變化回調
+      BackgroundTaskService.setNetworkCallback((isConnected) => {
+        console.log('📡 網路連接狀態變化:', isConnected ? '已連接' : '已斷開');
+        
+        // 如果網路恢復且應該持續播放，嘗試重新連接
+        if (isConnected && this.shouldKeepPlaying && !this.isUserStopped && !this.isPlaying) {
+          console.log('🔄 網路恢復，嘗試重新連接...');
+          this.handlePlaybackError(new Error('Network reconnected'));
+        }
+      });
+
+      console.log('✅ 音訊系統初始化成功（含後台支持）');
     } catch (error) {
       console.error('Error initializing audio:', error);
       throw error;
@@ -160,6 +191,20 @@ export class AudioPlayerService {
         this.sound = sound;
         await sound.playAsync();
         console.log('Stream playing successfully');
+        
+        // 激活保持喚醒（防止屏幕關閉時停止播放）
+        try {
+          await activateKeepAwakeAsync('audio-playback');
+          console.log('✅ Keep Awake 已激活（屏幕關閉時繼續播放）');
+        } catch (error) {
+          console.warn('⚠️ Keep Awake 激活失敗:', error);
+        }
+        
+        // 顯示媒體通知
+        if (this.currentStation) {
+          await MediaNotificationService.showNowPlaying(this.currentStation, true);
+        }
+        
         // 播放成功後保持播放狀態
         return; // 成功，退出重試循環
       } catch (error) {
@@ -203,6 +248,11 @@ export class AudioPlayerService {
       if (this.sound) {
         await this.sound.pauseAsync();
         this.notifyStatus(PlaybackStatus.PAUSED);
+        
+        // 更新通知狀態
+        if (this.currentStation) {
+          await MediaNotificationService.showNowPlaying(this.currentStation, false);
+        }
       }
     } catch (error) {
       console.error('Error pausing:', error);
@@ -219,6 +269,11 @@ export class AudioPlayerService {
       if (this.sound) {
         await this.sound.playAsync();
         this.notifyStatus(PlaybackStatus.PLAYING);
+        
+        // 更新通知狀態
+        if (this.currentStation) {
+          await MediaNotificationService.showNowPlaying(this.currentStation, true);
+        }
       }
     } catch (error) {
       console.error('Error resuming:', error);
@@ -231,10 +286,24 @@ export class AudioPlayerService {
    * Stop playback (user triggered)
    */
   static async stop(): Promise<void> {
-    console.log('User stopped playback');
+    console.log('🛑 User stopped playback');
     this.isUserStopped = true;
     this.shouldKeepPlaying = false;
     this.clearRetryTimeout();
+    this.clearBufferingTimeout();
+    this.clearBufferingCheck();
+    
+    // 停用保持喚醒
+    try {
+      deactivateKeepAwake('audio-playback');
+      console.log('✅ Keep Awake 已停用');
+    } catch (error) {
+      console.warn('⚠️ Keep Awake 停用失敗:', error);
+    }
+    
+    // 隱藏媒體通知
+    await MediaNotificationService.hideNotification();
+    
     await this.stopInternal();
   }
 
@@ -313,20 +382,38 @@ export class AudioPlayerService {
       if (status.isPlaying) {
         // 正在從緩衝區播放數據
         if (this.isBuffering) {
-          console.log('Buffer filled, resuming playback');
+          const bufferingDuration = Date.now() - this.bufferingStartTime;
+          console.log(`✅ Buffer filled after ${bufferingDuration}ms, resuming playback`);
           this.isBuffering = false;
+          this.clearBufferingTimeout(); // 清除緩衝超時計時器
+          this.clearBufferingCheck(); // 清除緩衝檢查計時器
         }
+        this.lastPlayingTime = Date.now();
         this.notifyStatus(PlaybackStatus.PLAYING);
+        
+        // 更新通知狀態
+        if (this.currentStation) {
+          MediaNotificationService.updateNotification(this.currentStation, 'playing').catch(console.error);
+        }
       } else if (status.isBuffering) {
         // Native 緩衝區需要更多數據
         if (!this.isBuffering) {
-          console.log('Buffering: waiting for more data from network...');
+          const timeSinceLastPlaying = this.lastPlayingTime > 0 ? Date.now() - this.lastPlayingTime : 0;
+          console.log(`⏸️ Buffering: waiting for more data from network... (${Math.floor(timeSinceLastPlaying / 1000)}s since last playing)`);
           this.isBuffering = true;
+          this.startBufferingTimeout(); // 啟動緩衝超時檢測
         }
         this.notifyStatus(PlaybackStatus.BUFFERING);
+        
+        // 更新通知狀態
+        if (this.currentStation) {
+          MediaNotificationService.updateNotification(this.currentStation, 'buffering').catch(console.error);
+        }
       } else if (status.didJustFinish) {
         // 串流結束，嘗試重連
-        console.log('Stream finished, attempting to reconnect...');
+        console.log('📡 Stream finished, attempting to reconnect...');
+        this.clearBufferingTimeout();
+        this.clearBufferingCheck();
         this.handlePlaybackError(new Error('Stream ended'));
       }
     } else if (status.error) {
@@ -340,20 +427,24 @@ export class AudioPlayerService {
    * Handle playback error
    */
   private static handlePlaybackError(error: any): void {
-    console.log('Handling playback error:', error);
+    console.log('⚠️ Handling playback error:', error.message || error);
+
+    // 清除緩衝相關計時器
+    this.clearBufferingTimeout();
+    this.clearBufferingCheck();
 
     // 如果使用者已停止，不嘗試重連
     if (this.isUserStopped || !this.shouldKeepPlaying) {
-      console.log('User stopped or should not keep playing, not retrying');
+      console.log('❌ User stopped or should not keep playing, not retrying');
       this.notifyStatus(PlaybackStatus.ERROR);
       return;
     }
 
-    // 固定間隔重試（從配置讀取，預設 3 秒）
+    // 固定間隔重試（從配置讀取）
     const delay = Config.NETWORK_RETRY.streamRetryInterval;
     this.retryCount++;
 
-    console.log(`Scheduling retry #${this.retryCount} in ${delay}ms (${delay/1000} seconds)`);
+    console.log(`🔄 Scheduling retry #${this.retryCount} in ${delay}ms (${delay/1000} seconds)`);
     this.notifyStatus(PlaybackStatus.BUFFERING);
 
     // 清除之前的計時器
@@ -362,7 +453,7 @@ export class AudioPlayerService {
     // 設定重試計時器
     this.retryTimeout = setTimeout(async () => {
       if (this.shouldKeepPlaying && !this.isUserStopped) {
-        console.log(`Executing retry #${this.retryCount}...`);
+        console.log(`▶️ Executing retry #${this.retryCount}...`);
         await this.startPlayback();
       }
     }, delay);
@@ -376,6 +467,76 @@ export class AudioPlayerService {
     if (this.retryTimeout) {
       clearTimeout(this.retryTimeout);
       this.retryTimeout = null;
+    }
+  }
+
+  /**
+   * 啟動緩衝超時檢測
+   * Start buffering timeout detection
+   */
+  private static startBufferingTimeout(): void {
+    // 清除之前的計時器
+    this.clearBufferingTimeout();
+    
+    this.bufferingStartTime = Date.now();
+    const timeout = Config.NETWORK_RETRY.bufferingTimeout || 15000;
+    
+    this.bufferingTimeoutId = setTimeout(() => {
+      const bufferingDuration = Date.now() - this.bufferingStartTime;
+      console.warn(`⚠️ Buffering timeout after ${bufferingDuration}ms, restarting playback...`);
+      
+      // 緩衝超時，嘗試重新播放
+      if (this.shouldKeepPlaying && !this.isUserStopped) {
+        this.handlePlaybackError(new Error('Buffering timeout'));
+      }
+    }, timeout);
+
+    // 啟動定期檢查（每 5 秒檢查一次）
+    this.startBufferingCheck();
+  }
+
+  /**
+   * 啟動定期緩衝檢查
+   * Start periodic buffering check
+   */
+  private static startBufferingCheck(): void {
+    this.clearBufferingCheck();
+    
+    this.bufferingCheckInterval = setInterval(() => {
+      if (this.isBuffering && this.shouldKeepPlaying && !this.isUserStopped) {
+        const bufferingDuration = Date.now() - this.bufferingStartTime;
+        console.log(`🔄 Still buffering... Duration: ${Math.floor(bufferingDuration / 1000)}s`);
+        
+        // 如果緩衝超過 10 秒，嘗試重新連接
+        if (bufferingDuration > 10000) {
+          console.warn(`⚠️ Buffering too long (${Math.floor(bufferingDuration / 1000)}s), attempting reconnect...`);
+          this.clearBufferingTimeout();
+          this.clearBufferingCheck();
+          this.handlePlaybackError(new Error('Prolonged buffering'));
+        }
+      }
+    }, 5000); // 每 5 秒檢查一次
+  }
+
+  /**
+   * 清除緩衝檢查計時器
+   * Clear buffering check interval
+   */
+  private static clearBufferingCheck(): void {
+    if (this.bufferingCheckInterval) {
+      clearInterval(this.bufferingCheckInterval);
+      this.bufferingCheckInterval = null;
+    }
+  }
+
+  /**
+   * 清除緩衝超時計時器
+   * Clear buffering timeout
+   */
+  private static clearBufferingTimeout(): void {
+    if (this.bufferingTimeoutId) {
+      clearTimeout(this.bufferingTimeoutId);
+      this.bufferingTimeoutId = null;
     }
   }
 
@@ -398,6 +559,22 @@ export class AudioPlayerService {
       this.isUserStopped = true;
       this.shouldKeepPlaying = false;
       this.clearRetryTimeout();
+      this.clearBufferingTimeout();
+      this.clearBufferingCheck();
+      
+      // 停用保持喚醒
+      try {
+        deactivateKeepAwake('audio-playback');
+      } catch (error) {
+        console.warn('Keep Awake cleanup warning:', error);
+      }
+      
+      // 清理通知服務
+      await MediaNotificationService.cleanup();
+      
+      // 清理後台任務服務
+      await BackgroundTaskService.cleanup();
+      
       await this.stopInternal();
       this.statusCallback = null;
       this.retryCount = 0;

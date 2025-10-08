@@ -45,8 +45,9 @@ export const Config = {
   NETWORK_RETRY: {
     maxAttemptsPerRequest: 3, // 每次請求的網路重試次數
     retryDelayBase: 500, // 基礎重試延遲（毫秒）
-    streamRetryInterval: 3000, // 串流重試固定間隔（毫秒）- 每 3 秒一次
+    streamRetryInterval: 2000, // 串流重試固定間隔（毫秒）- 每 2 秒一次（更積極）
     enableInfiniteRetry: true, // 啟用無限重試
+    bufferingTimeout: 15000, // 緩衝超時時間（15秒，更短以便更快重試）
   },
 };
 

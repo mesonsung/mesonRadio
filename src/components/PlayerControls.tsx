@@ -30,8 +30,10 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   canNavigate,
 }) => {
   const isPlaying = status === PlaybackStatus.PLAYING;
-  const isLoading = status === PlaybackStatus.LOADING || status === PlaybackStatus.BUFFERING;
+  const isLoading = status === PlaybackStatus.LOADING;
+  const isBuffering = status === PlaybackStatus.BUFFERING;
   const isError = status === PlaybackStatus.ERROR;
+  const isActive = isPlaying || isBuffering; // 正在播放或緩衝中
 
   const getStatusText = (): string => {
     switch (status) {
@@ -50,6 +52,40 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     }
   };
 
+  const renderMainButton = () => {
+    if (isBuffering) {
+      return (
+        <TouchableOpacity
+          style={[styles.mainButton, styles.mainButtonBuffering]}
+          onPress={onPlayPause}
+        >
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </TouchableOpacity>
+      );
+    }
+    
+    if (isLoading) {
+      return (
+        <View style={styles.mainButton}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      );
+    }
+    
+    return (
+      <TouchableOpacity
+        style={[styles.mainButton, isPlaying && styles.mainButtonPlaying]}
+        onPress={onPlayPause}
+      >
+        <Ionicons
+          name={isPlaying ? 'pause' : 'play'}
+          size={IconSizes.xl}
+          color={Colors.text}
+        />
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.statusContainer}>
@@ -66,7 +102,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
 
       <View style={styles.controlsContainer}>
         <TouchableOpacity
-          style={[styles.controlButton, !canNavigate && styles.controlButtonDisabled]}
+          style={[styles.controlButton, (!canNavigate || isLoading) && styles.controlButtonDisabled]}
           onPress={onPrevious}
           disabled={!canNavigate || isLoading}
         >
@@ -77,26 +113,11 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           />
         </TouchableOpacity>
 
-        {isLoading ? (
-          <View style={styles.mainButton}>
-            <ActivityIndicator size="large" color={Colors.primary} />
-          </View>
-        ) : (
-          <TouchableOpacity
-            style={[styles.mainButton, isPlaying && styles.mainButtonPlaying]}
-            onPress={onPlayPause}
-            disabled={isLoading}
-          >
-            <Ionicons
-              name={isPlaying ? 'pause' : 'play'}
-              size={IconSizes.xl}
-              color={Colors.text}
-            />
-          </TouchableOpacity>
-        )}
+        {/* 主播放按鈕 */}
+        {renderMainButton()}
 
         <TouchableOpacity
-          style={[styles.controlButton, !canNavigate && styles.controlButtonDisabled]}
+          style={[styles.controlButton, (!canNavigate || isLoading) && styles.controlButtonDisabled]}
           onPress={onNext}
           disabled={!canNavigate || isLoading}
         >
@@ -108,7 +129,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
         </TouchableOpacity>
       </View>
 
-      {(isPlaying || status === PlaybackStatus.PAUSED) && (
+      {/* 在緩衝或播放時都顯示停止按鈕，讓使用者能隨時停止 */}
+      {(isActive || status === PlaybackStatus.PAUSED) && (
         <TouchableOpacity style={styles.stopButton} onPress={onStop}>
           <Ionicons name="stop" size={IconSizes.md} color={Colors.error} />
           <Text style={styles.stopText}>{t('player.stop')}</Text>
@@ -173,6 +195,9 @@ const styles = StyleSheet.create({
   },
   mainButtonPlaying: {
     backgroundColor: Colors.primary,
+  },
+  mainButtonBuffering: {
+    backgroundColor: Colors.surface,
   },
   stopButton: {
     flexDirection: 'row',
