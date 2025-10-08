@@ -101,11 +101,14 @@ class AudioForegroundService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "音頻播放",
-                NotificationManager.IMPORTANCE_LOW // 低重要性，不打擾用戶
+                "背景播放",  // 簡短名稱
+                NotificationManager.IMPORTANCE_MIN  // 最低重要性 - 不會發出聲音、不震動、不彈出
             ).apply {
                 description = "保持音頻播放運行"
-                setShowBadge(false)
+                setShowBadge(false)  // 不顯示角標
+                enableLights(false)  // 不閃燈
+                enableVibration(false)  // 不震動
+                setSound(null, null)  // 不發出聲音
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
             
@@ -125,13 +128,17 @@ class AudioForegroundService : Service() {
         )
         
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("mesonRadio 播放中")
-            .setContentText(stationName)
+            .setContentTitle("🎵 $stationName")  // 電台名稱作為標題，更簡潔
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentIntent(pendingIntent)
-            .setOngoing(true) // 持續通知
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true) // 持續通知（前台服務必須）
+            .setPriority(NotificationCompat.PRIORITY_MIN)  // 最低優先級 - 最不顯眼
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setShowWhen(false)  // 不顯示時間
+            .setSound(null)  // 靜音
+            .setVibrate(null)  // 不震動
+            .setOnlyAlertOnce(true)  // 只提醒一次
+            .setSilent(true)  // 完全靜音
             .build()
     }
 }
