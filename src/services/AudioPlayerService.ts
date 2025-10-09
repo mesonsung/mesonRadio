@@ -36,6 +36,8 @@ export class AudioPlayerService {
   private static notificationUpdateTimer: NodeJS.Timeout | null = null; // 防抖计时器
   private static healthCheckInterval: NodeJS.Timeout | null = null; // 健康檢查計時器
   private static lastHealthCheckTime: number = 0; // 上次健康檢查時間
+  private static isInitializing: boolean = false; // 正在初始化標誌（防止多個播放實體）
+  private static playLock: boolean = false; // 播放方法鎖（防止並發調用）
 
   /**
    * 初始化音訊系統
@@ -97,26 +99,44 @@ export class AudioPlayerService {
    */
   static async play(station: Station): Promise<void> {
     try {
-      console.log('User triggered play for station:', station.name);
+      // 🔒 防止並發調用 - 如果已經在處理播放請求，忽略新請求
+      if (this.playLock) {
+        console.log('⚠️ Play already in progress, ignoring duplicate request');
+        return;
+      }
       
-      // 清除重試計時器
-      this.clearRetryTimeout();
+      this.playLock = true;
+      console.log('🔒 Play lock acquired for station:', station.name);
       
-      // 重置狀態
-      this.isUserStopped = false;
-      this.shouldKeepPlaying = true;
-      this.retryCount = 0;
-      
-      // 停止當前播放（不重置 shouldKeepPlaying）
-      await this.stopInternal();
+      try {
+        console.log('User triggered play for station:', station.name);
+        
+        // 清除重試計時器
+        this.clearRetryTimeout();
+        
+        // 重置狀態
+        this.isUserStopped = false;
+        this.shouldKeepPlaying = true;
+        this.retryCount = 0;
+        
+        // 停止當前播放（不重置 shouldKeepPlaying）
+        await this.stopInternal();
 
-      this.currentStation = station;
-      this.isPlaying = true;
-      
-      // 開始播放
-      await this.startPlayback();
+        this.currentStation = station;
+        this.isPlaying = true;
+        
+        // 開始播放
+        await this.startPlayback();
+      } finally {
+        // 延遲釋放鎖，確保播放器完全初始化
+        setTimeout(() => {
+          this.playLock = false;
+          console.log('🔓 Play lock released');
+        }, 1000); // 1秒後釋放鎖
+      }
     } catch (error) {
       console.error('Error playing station:', error);
+      this.playLock = false; // 發生錯誤時立即釋放鎖
       this.handlePlaybackError(error);
     }
   }
@@ -162,75 +182,98 @@ export class AudioPlayerService {
       try {
         console.log(`Network attempt ${attempt}/${maxNetworkRetries} for URL: ${url}`);
         
-        // 清理舊的 sound 對象
-        if (this.sound) {
-          try {
-            await this.sound.unloadAsync();
-          } catch (e) {
-            console.log('Error unloading previous sound:', e);
+        // 🔒 防止多個播放實體同時初始化
+        if (this.isInitializing) {
+          console.log('⚠️ Sound initialization already in progress, waiting...');
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // 如果還在初始化，跳過此次嘗試
+          if (this.isInitializing) {
+            console.log('⚠️ Still initializing, skipping duplicate attempt');
+            continue;
           }
-          this.sound = null;
         }
+        
+        this.isInitializing = true;
+        console.log('🔒 Sound initialization lock acquired');
+        
+        try {
+          // 清理舊的 sound 對象
+          if (this.sound) {
+            try {
+              await this.sound.unloadAsync();
+              console.log('✅ Previous sound instance unloaded');
+            } catch (e) {
+              console.log('Error unloading previous sound:', e);
+            }
+            this.sound = null;
+          }
 
-        // 創建音訊對象，設置流式播放和緩衝參數
-        const { sound } = await Audio.Sound.createAsync(
-          { 
-            uri: url,
-            // 使用漸進式下載模式，支持流式播放
-            overrideFileExtensionAndroid: 'mp3', // 優化 Android 流式播放
-          },
-          { 
-            shouldPlay: true, 
+          // 創建音訊對象，設置流式播放和緩衝參數
+          const { sound } = await Audio.Sound.createAsync(
+            { 
+              uri: url,
+              // 使用漸進式下載模式，支持流式播放
+              overrideFileExtensionAndroid: 'mp3', // 優化 Android 流式播放
+            },
+            { 
+              shouldPlay: true, 
+              volume: Config.DEFAULT_VOLUME,
+              // 緩衝狀態更新間隔
+              progressUpdateIntervalMillis: Config.BUFFER_CONFIG.progressUpdateInterval,
+              positionMillis: 0,
+              // 音質設定
+              rate: 1.0,
+              shouldCorrectPitch: true,
+              pitchCorrectionQuality: Audio.PitchCorrectionQuality.High,
+              // 允許在背景播放
+              isLooping: false,
+            },
+            this.onPlaybackStatusUpdate.bind(this)
+          );
+
+          this.sound = sound;
+          console.log('✅ Sound instance created successfully');
+          
+          // 設置音頻會話為活躍狀態
+          await sound.setStatusAsync({
+            shouldPlay: true,
             volume: Config.DEFAULT_VOLUME,
-            // 緩衝狀態更新間隔
-            progressUpdateIntervalMillis: Config.BUFFER_CONFIG.progressUpdateInterval,
-            positionMillis: 0,
-            // 音質設定
-            rate: 1.0,
-            shouldCorrectPitch: true,
-            pitchCorrectionQuality: Audio.PitchCorrectionQuality.High,
-            // 允許在背景播放
-            isLooping: false,
-          },
-          this.onPlaybackStatusUpdate.bind(this)
-        );
+          });
+          
+          await sound.playAsync();
+          console.log('✅ 流媒體播放成功');
 
-        this.sound = sound;
-        
-        // 設置音頻會話為活躍狀態
-        await sound.setStatusAsync({
-          shouldPlay: true,
-          volume: Config.DEFAULT_VOLUME,
-        });
-        
-        await sound.playAsync();
-        console.log('✅ 流媒體播放成功');
+          // ⭐ 關鍵：激活保持喚醒（防止屏幕關閉時停止播放）
+          try {
+            await activateKeepAwakeAsync('audio-playback');
+            console.log('✅ Keep Awake 已激活（屏幕關閉時繼續播放）');
+          } catch (error) {
+            console.warn('⚠️ Keep Awake 激活失敗:', error);
+          }
 
-        // ⭐ 關鍵：激活保持喚醒（防止屏幕關閉時停止播放）
-        try {
-          await activateKeepAwakeAsync('audio-playback');
-          console.log('✅ Keep Awake 已激活（屏幕關閉時繼續播放）');
-        } catch (error) {
-          console.warn('⚠️ Keep Awake 激活失敗:', error);
+          // ⭐⭐⭐ 啟動前台服務（最強保護）
+          try {
+            await ForegroundService.start(this.currentStation?.name || 'mesonRadio');
+          } catch (error) {
+            console.warn('⚠️ 前台服務啟動失敗:', error);
+          }
+
+          // 啟動健康檢查
+          this.startHealthCheck();
+          
+          // 顯示媒體通知
+          if (this.currentStation) {
+            await MediaNotificationService.showNowPlaying(this.currentStation, true);
+          }
+          
+          // 播放成功後保持播放狀態
+          return; // 成功，退出重試循環
+        } finally {
+          // 🔓 釋放初始化鎖
+          this.isInitializing = false;
+          console.log('🔓 Sound initialization lock released');
         }
-
-        // ⭐⭐⭐ 啟動前台服務（最強保護）
-        try {
-          await ForegroundService.start(this.currentStation?.name || 'mesonRadio');
-        } catch (error) {
-          console.warn('⚠️ 前台服務啟動失敗:', error);
-        }
-
-        // 啟動健康檢查
-        this.startHealthCheck();
-        
-        // 顯示媒體通知
-        if (this.currentStation) {
-          await MediaNotificationService.showNowPlaying(this.currentStation, true);
-        }
-        
-        // 播放成功後保持播放狀態
-        return; // 成功，退出重試循環
       } catch (error) {
         lastError = error;
         console.error(`Network attempt ${attempt} failed:`, error);
@@ -352,10 +395,14 @@ export class AudioPlayerService {
    */
   private static async stopInternal(): Promise<void> {
     try {
+      // 🔓 確保清除初始化鎖
+      this.isInitializing = false;
+      
       if (this.sound) {
         await this.sound.stopAsync();
         await this.sound.unloadAsync();
         this.sound = null;
+        console.log('✅ Sound instance stopped and unloaded');
       }
       this.isPlaying = false;
       
@@ -367,6 +414,8 @@ export class AudioPlayerService {
     } catch (error) {
       console.error('Error stopping:', error);
       this.isPlaying = false;
+      this.sound = null; // 確保清除 sound 引用
+      this.isInitializing = false; // 確保清除初始化鎖
     }
   }
 
@@ -689,8 +738,16 @@ export class AudioPlayerService {
    */
   static async cleanup(): Promise<void> {
     try {
+      console.log('🧹 Starting cleanup...');
+      
       this.isUserStopped = true;
       this.shouldKeepPlaying = false;
+      
+      // 🔓 釋放所有鎖
+      this.playLock = false;
+      this.isInitializing = false;
+      console.log('🔓 All locks released');
+      
       this.clearRetryTimeout();
       this.clearBufferingTimeout();
       this.clearBufferingCheck();
@@ -719,9 +776,14 @@ export class AudioPlayerService {
       await this.stopInternal();
       this.statusCallback = null;
       this.retryCount = 0;
+      
+      console.log('✅ Cleanup completed');
     } catch (error) {
       console.error('Error cleaning up:', error);
       this.isPlaying = false;
+      this.playLock = false;
+      this.isInitializing = false;
+      this.sound = null;
     }
   }
 
