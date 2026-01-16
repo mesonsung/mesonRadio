@@ -75,8 +75,16 @@ export class SmartSearchService {
       // 載入所有 AI 提供商的 API Keys
       const geminiKey = await AsyncStorage.getItem('@mesonRadio:geminiApiKey');
       const chatgptKey = await AsyncStorage.getItem('@mesonRadio:chatgptApiKey');
-      const grokKey = await AsyncStorage.getItem('@mesonRadio:grokApiKey');
+      let grokKey = await AsyncStorage.getItem('@mesonRadio:grokApiKey');
       const provider = await AsyncStorage.getItem('@mesonRadio:aiProvider');
+
+      // 如果沒有用戶設置的 Grok API Key，使用預設值
+      if (!grokKey && Config.AI_API_KEYS.GROK) {
+        grokKey = Config.AI_API_KEYS.GROK;
+        // 自動保存預設 API Key 到存儲（方便用戶後續查看和修改）
+        await AsyncStorage.setItem('@mesonRadio:grokApiKey', grokKey);
+        console.log('✅ 已使用預設的 xAI API Key');
+      }
 
       if (geminiKey) this.aiConfigs.set(AIProvider.GEMINI, geminiKey);
       if (chatgptKey) this.aiConfigs.set(AIProvider.CHATGPT, chatgptKey);

@@ -22,12 +22,15 @@ interface RadioBrowserStation {
 }
 
 export class RadioBrowserService {
-  // 多個備用伺服器節點
+  // 多個備用伺服器節點（已測試驗證的可用端點）
   private static servers = [
-    'https://de1.api.radio-browser.info',
-    'https://at1.api.radio-browser.info',
-    'https://nl1.api.radio-browser.info',
-    'https://fr1.api.radio-browser.info',
+    'https://de1.api.radio-browser.info',    // 德國伺服器 1（主要，已驗證可用）
+    'https://de2.api.radio-browser.info',    // 德國伺服器 2（已驗證可用）
+    // 以下伺服器目前無法連接，已移除：
+    // 'https://at1.api.radio-browser.info',  // 奧地利伺服器（連接失敗）
+    // 'https://nl1.api.radio-browser.info', // 荷蘭伺服器（連接失敗）
+    // 'https://fr1.api.radio-browser.info', // 法國伺服器（連接失敗）
+    // 'https://fi1.api.radio-browser.info', // 芬蘭伺服器（連接失敗）
   ];
   
   private static currentServerIndex = 0;
@@ -86,6 +89,9 @@ export class RadioBrowserService {
             order: 'votes',
             reverse: true,
           },
+          headers: {
+            'User-Agent': 'mesonRadio/1.0.0', // Radio Browser API 要求
+          },
           timeout: 10000, // 10秒超時
         }
       );
@@ -115,6 +121,9 @@ export class RadioBrowserService {
             hidebroken: true,
             order: 'votes',
             reverse: true,
+          },
+          headers: {
+            'User-Agent': 'mesonRadio/1.0.0', // Radio Browser API 要求
           },
           timeout: 10000,
         }
@@ -146,6 +155,9 @@ export class RadioBrowserService {
             order: 'votes',
             reverse: true,
           },
+          headers: {
+            'User-Agent': 'mesonRadio/1.0.0', // Radio Browser API 要求
+          },
           timeout: 10000,
         }
       );
@@ -175,6 +187,9 @@ export class RadioBrowserService {
             hidebroken: true,
             order: 'votes',
             reverse: true,
+          },
+          headers: {
+            'User-Agent': 'mesonRadio/1.0.0', // Radio Browser API 要求
           },
           timeout: 10000,
         }

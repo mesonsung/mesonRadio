@@ -4,7 +4,7 @@
  */
 
 export const Config = {
-  // Radio Browser API for searching stations
+  // Radio Browser API for searching stations (最新端點)
   RADIO_BROWSER_API: 'https://de1.api.radio-browser.info/json',
   
   // Storage keys
@@ -48,6 +48,11 @@ export const Config = {
     streamRetryInterval: 2000, // 串流重試固定間隔（毫秒）- 每 2 秒一次（更積極）
     enableInfiniteRetry: true, // 啟用無限重試
     bufferingTimeout: 15000, // 緩衝超時時間（15秒，更短以便更快重試）
+  },
+
+  // AI API Keys (預設值，僅在用戶未設置時使用)
+  AI_API_KEYS: {
+    GROK: '',
   },
 };
 
