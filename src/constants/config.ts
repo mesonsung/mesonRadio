@@ -51,8 +51,16 @@ export const Config = {
   },
 
   // AI API Keys (預設值，僅在用戶未設置時使用)
+  // 注意：敏感資訊不應硬編碼在代碼中
+  // 預設 API Key 應通過環境變數、.env 文件或運行時配置提供
+  // 用戶應在應用中通過「設定」→「AI 設定」手動配置 API Key
+  // 
+  // 如需設置預設 API Key，請使用環境變數：
+  // - 創建 .env 文件（已在 .gitignore 中）
+  // - 設置 EXPO_PUBLIC_GROK_API_KEY=your-key-here
+  // - 或在 app.config.js 的 extra 中配置
   AI_API_KEYS: {
-    GROK: '',
+    GROK: (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_GROK_API_KEY) || '', // 從環境變數讀取
   },
 };
 

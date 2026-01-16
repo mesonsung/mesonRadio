@@ -78,12 +78,13 @@ export class SmartSearchService {
       let grokKey = await AsyncStorage.getItem('@mesonRadio:grokApiKey');
       const provider = await AsyncStorage.getItem('@mesonRadio:aiProvider');
 
-      // 如果沒有用戶設置的 Grok API Key，使用預設值
-      if (!grokKey && Config.AI_API_KEYS.GROK) {
+      // 如果沒有用戶設置的 Grok API Key，嘗試使用環境變數或預設值
+      // 注意：預設 API Key 應通過環境變數提供，不應硬編碼在代碼中
+      if (!grokKey && Config.AI_API_KEYS.GROK && Config.AI_API_KEYS.GROK.trim()) {
         grokKey = Config.AI_API_KEYS.GROK;
-        // 自動保存預設 API Key 到存儲（方便用戶後續查看和修改）
+        // 只有在有有效 API Key 時才保存
         await AsyncStorage.setItem('@mesonRadio:grokApiKey', grokKey);
-        console.log('✅ 已使用預設的 xAI API Key');
+        console.log('✅ 已使用預設的 xAI API Key（從環境變數）');
       }
 
       if (geminiKey) this.aiConfigs.set(AIProvider.GEMINI, geminiKey);

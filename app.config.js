@@ -69,6 +69,9 @@ export default {
       eas: {
         projectId: 'afb3c6af-1be6-4885-8f79-1414c0a9f7c8',
       },
+      // AI API Keys (從環境變數讀取，不應硬編碼)
+      // 設置方式：創建 .env 文件並設置 EXPO_PUBLIC_GROK_API_KEY=your-key
+      grokApiKey: process.env.EXPO_PUBLIC_GROK_API_KEY || '',
     },
   },
 };
