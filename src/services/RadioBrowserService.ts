@@ -89,12 +89,9 @@ export class RadioBrowserService {
             order: 'votes',
             reverse: true,
           },
-<<<<<<< HEAD
-=======
           headers: {
             'User-Agent': 'mesonRadio/1.0.0', // Radio Browser API 要求
           },
->>>>>>> 99cfb686d0b7f75dd5fab96cab46ed6cc5e9013e
           timeout: 10000, // 10秒超時
         }
       );
@@ -125,12 +122,9 @@ export class RadioBrowserService {
             order: 'votes',
             reverse: true,
           },
-<<<<<<< HEAD
-=======
           headers: {
             'User-Agent': 'mesonRadio/1.0.0', // Radio Browser API 要求
           },
->>>>>>> 99cfb686d0b7f75dd5fab96cab46ed6cc5e9013e
           timeout: 10000,
         }
       );
@@ -161,12 +155,9 @@ export class RadioBrowserService {
             order: 'votes',
             reverse: true,
           },
-<<<<<<< HEAD
-=======
           headers: {
             'User-Agent': 'mesonRadio/1.0.0', // Radio Browser API 要求
           },
->>>>>>> 99cfb686d0b7f75dd5fab96cab46ed6cc5e9013e
           timeout: 10000,
         }
       );
@@ -197,12 +188,9 @@ export class RadioBrowserService {
             order: 'votes',
             reverse: true,
           },
-<<<<<<< HEAD
-=======
           headers: {
             'User-Agent': 'mesonRadio/1.0.0', // Radio Browser API 要求
           },
->>>>>>> 99cfb686d0b7f75dd5fab96cab46ed6cc5e9013e
           timeout: 10000,
         }
       );

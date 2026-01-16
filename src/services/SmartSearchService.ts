@@ -339,8 +339,6 @@ export class SmartSearchService {
   }
 
   /**
-<<<<<<< HEAD
-=======
    * 獲取 Gemini 可用模型列表（公開方法，供UI使用）
    */
   static async getAvailableGeminiModels(apiKey?: string): Promise<string[]> {
@@ -627,18 +625,6 @@ export class SmartSearchService {
     stations: Station[],
     apiKey: string
   ): Promise<SearchResult[]> {
-<<<<<<< HEAD
-    const genAI = new GoogleGenerativeAI(apiKey);
-    
-    // 使用最新的 Gemini 2.5 Flash 模型
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-
-    const prompt = this.buildPrompt(query, stations);
-    const result = await model.generateContent(prompt);
-    const response = result.response.text();
-
-    return this.parseAIResponse(response, stations);
-=======
     // 獲取可用模型列表
     const allModels = await this.getGeminiModels(apiKey);
     
@@ -678,7 +664,6 @@ export class SmartSearchService {
     
     // 如果所有模型都失敗，拋出最後一個錯誤
     throw lastError || new Error('所有 Gemini 模型都無法使用');
->>>>>>> 99cfb686d0b7f75dd5fab96cab46ed6cc5e9013e
   }
 
   /**
@@ -689,40 +674,6 @@ export class SmartSearchService {
     stations: Station[],
     apiKey: string
   ): Promise<SearchResult[]> {
-<<<<<<< HEAD
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini', // 便宜快速的模型
-        messages: [
-          {
-            role: 'system',
-            content: '你是一個專業的台灣電台推薦助手。請根據用戶需求推薦電台，並以 JSON 格式回覆。',
-          },
-          {
-            role: 'user',
-            content: this.buildPrompt(query, stations),
-          },
-        ],
-        temperature: 0.7,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`ChatGPT API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const aiResponse = data.choices[0].message.content;
-
-    return this.parseAIResponse(aiResponse, stations);
-  }
-
-=======
     // 獲取可用模型列表
     const allModels = await this.getChatGPTModels(apiKey);
     
@@ -935,9 +886,6 @@ export class SmartSearchService {
     this.grokModelsCache = defaultModels;
     return defaultModels;
   }
-
-
->>>>>>> 99cfb686d0b7f75dd5fab96cab46ed6cc5e9013e
   /**
    * 使用 Grok 搜尋
    */
@@ -946,38 +894,6 @@ export class SmartSearchService {
     stations: Station[],
     apiKey: string
   ): Promise<SearchResult[]> {
-<<<<<<< HEAD
-    const response = await fetch('https://api.x.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'grok-beta', // Grok 模型
-        messages: [
-          {
-            role: 'system',
-            content: '你是一個專業的台灣電台推薦助手。請根據用戶需求推薦電台，並以 JSON 格式回覆。',
-          },
-          {
-            role: 'user',
-            content: this.buildPrompt(query, stations),
-          },
-        ],
-        temperature: 0.7,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Grok API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const aiResponse = data.choices[0].message.content;
-
-    return this.parseAIResponse(aiResponse, stations);
-=======
     // 獲取可用模型列表（會自動使用快取或從 API 獲取）
     const allModels = await this.getGrokModels(apiKey);
     
@@ -1065,7 +981,6 @@ export class SmartSearchService {
     
     // 如果所有模型都失敗，拋出最後一個錯誤
     throw lastError || new Error('所有 Grok 模型都無法使用');
->>>>>>> 99cfb686d0b7f75dd5fab96cab46ed6cc5e9013e
   }
 
   /**

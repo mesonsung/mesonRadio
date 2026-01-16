@@ -333,8 +333,6 @@ export const AISettingsScreen: React.FC = () => {
           </Text>
         </TouchableOpacity>
 
-<<<<<<< HEAD
-=======
         {/* 模型選擇 */}
         {isProviderConfigured(currentProvider) && (
           <View style={styles.modelSection}>
@@ -766,8 +764,6 @@ const styles = StyleSheet.create({
     color: Colors.text,
     lineHeight: 20,
   },
-<<<<<<< HEAD
-=======
   modelSection: {
     marginTop: 16,
     paddingTop: 16,
@@ -865,5 +861,4 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
   },
->>>>>>> 99cfb686d0b7f75dd5fab96cab46ed6cc5e9013e
 });

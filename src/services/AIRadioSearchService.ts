@@ -175,8 +175,6 @@ export class AIRadioSearchService {
   }
   
   /**
-<<<<<<< HEAD
-=======
    * 獲取 Gemini 可用模型列表
    */
   private static async getGeminiModels(apiKey: string): Promise<string[]> {
@@ -264,7 +262,6 @@ export class AIRadioSearchService {
   }
 
   /**
->>>>>>> 99cfb686d0b7f75dd5fab96cab46ed6cc5e9013e
    * 使用 Gemini 獲取推薦
    */
   private static async getRecommendationsFromGemini(userQuery: string): Promise<Array<{
@@ -275,20 +272,6 @@ export class AIRadioSearchService {
     const apiKey = SmartSearchService.getAPIKey(AIProvider.GEMINI);
     if (!apiKey) return [];
     
-<<<<<<< HEAD
-    try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      // 使用正確的模型名稱
-      const model = genAI.getGenerativeModel({ 
-        model: 'gemini-1.5-flash',
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 1024,
-        },
-      });
-=======
     // 獲取可用模型列表
     const allModels = await this.getGeminiModels(apiKey);
     
@@ -312,7 +295,6 @@ export class AIRadioSearchService {
             maxOutputTokens: 1024,
           },
         });
->>>>>>> 99cfb686d0b7f75dd5fab96cab46ed6cc5e9013e
       
       const prompt = `
 你是一個專業的網路電台推薦專家。用戶想要：「${userQuery}」
@@ -342,20 +324,6 @@ export class AIRadioSearchService {
 5. 如果不確定，推薦通用電台名稱如 "news", "classical", "jazz"
 `;
       
-<<<<<<< HEAD
-      const result = await model.generateContent(prompt);
-      const response = result.response.text();
-      
-      console.log('Gemini AI 回應:', response);
-      return this.parseAIResponse(response);
-    } catch (error) {
-      console.error('Gemini API 調用失敗:', error);
-      return [];
-    }
-  }
-  
-  /**
-=======
         const result = await model.generateContent(prompt);
         const response = result.response.text();
         
@@ -464,7 +432,6 @@ export class AIRadioSearchService {
   }
 
   /**
->>>>>>> 99cfb686d0b7f75dd5fab96cab46ed6cc5e9013e
    * 使用 ChatGPT 獲取推薦
    */
   private static async getRecommendationsFromChatGPT(userQuery: string): Promise<Array<{
@@ -475,27 +442,6 @@ export class AIRadioSearchService {
     const apiKey = SmartSearchService.getAPIKey(AIProvider.CHATGPT);
     if (!apiKey) return [];
     
-<<<<<<< HEAD
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: '你是一個專業的網路電台推薦專家。請推薦真實存在的網路電台，並以 JSON 格式回覆。',
-          },
-          {
-            role: 'user',
-            content: `
-用戶想要：「${userQuery}」
-
-請推薦 5-10 個符合需求的「真實存在的網路電台名稱」。
-=======
     // 獲取可用模型列表
     const allModels = await this.getChatGPTModels(apiKey);
     
@@ -528,7 +474,6 @@ export class AIRadioSearchService {
 用戶想要：「${userQuery}」
 
 請推薦 3-5 個符合需求的「真實存在的網路電台名稱」。
->>>>>>> 99cfb686d0b7f75dd5fab96cab46ed6cc5e9013e
 
 請以 JSON 格式回覆：
 [
@@ -540,31 +485,6 @@ export class AIRadioSearchService {
 ]
 
 注意：
-<<<<<<< HEAD
-1. searchTerm 應該是英文電台名稱
-2. 優先推薦國際知名電台（如 BBC, NPR, KCRW 等）
-3. 如果用戶指定國家/語言，優先推薦該國家/語言的電台
-4. 只回傳 JSON 數組
-`,
-          },
-        ],
-        temperature: 0.7,
-        response_format: { type: 'json_object' },
-      }),
-    });
-    
-    if (!response.ok) {
-      throw new Error(`ChatGPT API 錯誤: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    const content = data.choices[0]?.message?.content || '[]';
-    
-    return this.parseAIResponse(content);
-  }
-  
-  /**
-=======
 1. searchTerm 應該是簡短、常用的英文電台名稱（如 BBC, NPR, KCRW）
 2. 優先推薦國際知名電台
 3. 只回傳 JSON 數組，不要其他文字
@@ -736,7 +656,6 @@ export class AIRadioSearchService {
   }
 
   /**
->>>>>>> 99cfb686d0b7f75dd5fab96cab46ed6cc5e9013e
    * 使用 Grok 獲取推薦
    */
   private static async getRecommendationsFromGrok(userQuery: string): Promise<Array<{
@@ -745,29 +664,6 @@ export class AIRadioSearchService {
     genre: string;
   }>> {
     const apiKey = SmartSearchService.getAPIKey(AIProvider.GROK);
-<<<<<<< HEAD
-    if (!apiKey) return [];
-    
-    const response = await fetch('https://api.x.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'grok-beta',
-        messages: [
-          {
-            role: 'system',
-            content: '你是一個專業的網路電台推薦專家。請推薦真實存在的網路電台，並以 JSON 格式回覆。',
-          },
-          {
-            role: 'user',
-            content: `
-用戶想要：「${userQuery}」
-
-請推薦 5-10 個符合需求的「真實存在的網路電台名稱」。
-=======
     if (!apiKey) {
       console.error('❌ Grok API Key 未配置');
       return [];
@@ -806,7 +702,6 @@ export class AIRadioSearchService {
 用戶想要：「${userQuery}」
 
 請推薦 3-5 個符合需求的「真實存在的網路電台名稱」。
->>>>>>> 99cfb686d0b7f75dd5fab96cab46ed6cc5e9013e
 
 請以 JSON 格式回覆：
 [
@@ -817,24 +712,6 @@ export class AIRadioSearchService {
   }
 ]
 
-<<<<<<< HEAD
-注意：searchTerm 應該是英文電台名稱，優先推薦國際知名電台。
-`,
-          },
-        ],
-        temperature: 0.7,
-      }),
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Grok API 錯誤: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    const content = data.choices[0]?.message?.content || '[]';
-    
-    return this.parseAIResponse(content);
-=======
 注意：
 1. searchTerm 應該是簡短、常用的英文電台名稱（如 BBC, NPR, KCRW）
 2. 優先推薦國際知名電台
@@ -901,7 +778,6 @@ export class AIRadioSearchService {
     
     // 如果所有模型都失敗，拋出最後一個錯誤
     throw lastError || new Error('所有 Grok 模型都無法使用');
->>>>>>> 99cfb686d0b7f75dd5fab96cab46ed6cc5e9013e
   }
   
   /**

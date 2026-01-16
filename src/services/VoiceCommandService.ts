@@ -218,25 +218,21 @@ export class VoiceCommandService {
   }
 
   /**
-   * 使用 AI 分析命令
+   * 使用 AI 分析命令（支持所有 AI 提供商）
    */
   private static async analyzeCommand(command: string): Promise<{
     intent: string;
     keyword: string;
     description: string;
   }> {
-    try {
-      const apiKey = SmartSearchService.getAPIKey(SmartSearchService.getCurrentProvider());
-      if (!apiKey) {
-        throw new Error('未配置 AI API Key');
-      }
+    const provider = SmartSearchService.getCurrentProvider();
+    const apiKey = SmartSearchService.getAPIKey(provider);
+    
+    if (!apiKey) {
+      throw new Error('未配置 AI API Key');
+    }
 
-      const genAI = new GoogleGenerativeAI(apiKey);
-      
-      // 使用最新的 Gemini 2.5 Flash 模型（快速且強大）
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-
-      const prompt = `你是一個智能電台助手。分析用戶的語音命令，判斷他們想聽什麼類型的電台。
+    const prompt = `你是一個智能電台助手。分析用戶的語音命令，判斷他們想聽什麼類型的電台。
 
 用戶說：「${command}」
 
@@ -258,20 +254,305 @@ export class VoiceCommandService {
 
 只返回 JSON，不要其他文字：`;
 
-      const result = await model.generateContent(prompt);
-      const response = result.response.text().trim();
+    try {
+      let response: string | undefined;
+
+      if (provider === AIProvider.GEMINI) {
+        // 使用 Gemini
+        const genAI = new GoogleGenerativeAI(apiKey);
+        
+        // 獲取可用模型列表
+        const allModels = await this.getGeminiModels(apiKey);
+        const customModel = SmartSearchService.getCustomModel(AIProvider.GEMINI);
+        const models = customModel && allModels.includes(customModel)
+          ? [customModel, ...allModels.filter(m => m !== customModel)]
+          : allModels;
+        
+        let lastError: Error | null = null;
+        
+        for (const modelName of models) {
+          try {
+            const model = genAI.getGenerativeModel({ model: modelName });
+            const result = await model.generateContent(prompt);
+            response = result.response.text().trim();
+            console.log(`✅ Gemini 分析成功（使用模型: ${modelName}）`);
+            break;
+          } catch (error) {
+            if (modelName === models[models.length - 1]) {
+              throw error;
+            }
+            lastError = error instanceof Error ? error : new Error(String(error));
+            console.log(`⚠️ 模型 ${modelName} 失敗，嘗試下一個模型...`);
+          }
+        }
+        
+        if (lastError && !response) {
+          throw lastError;
+        }
+      } else if (provider === AIProvider.CHATGPT) {
+        // 使用 ChatGPT
+        const allModels = await this.getChatGPTModels(apiKey);
+        const customModel = SmartSearchService.getCustomModel(AIProvider.CHATGPT);
+        const models = customModel && allModels.includes(customModel)
+          ? [customModel, ...allModels.filter(m => m !== customModel)]
+          : allModels;
+        
+        let lastError: Error | null = null;
+        
+        for (const modelName of models) {
+          try {
+            const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+              },
+              body: JSON.stringify({
+                model: modelName,
+                messages: [
+                  {
+                    role: 'system',
+                    content: '你是一個智能電台助手。請以 JSON 格式回覆。',
+                  },
+                  {
+                    role: 'user',
+                    content: prompt,
+                  },
+                ],
+                temperature: 0.7,
+              }),
+            });
+
+            if (!aiResponse.ok) {
+              const errorText = await aiResponse.text();
+              throw new Error(`ChatGPT API 錯誤: ${aiResponse.status} - ${errorText.substring(0, 100)}`);
+            }
+
+            const data = await aiResponse.json();
+            response = data.choices[0]?.message?.content || '';
+            console.log(`✅ ChatGPT 分析成功（使用模型: ${modelName}）`);
+            break;
+          } catch (error) {
+            if (modelName === models[models.length - 1]) {
+              throw error;
+            }
+            lastError = error instanceof Error ? error : new Error(String(error));
+            console.log(`⚠️ 模型 ${modelName} 失敗，嘗試下一個模型...`);
+          }
+        }
+        
+        if (lastError && !response) {
+          throw lastError;
+        }
+      } else if (provider === AIProvider.GROK) {
+        // 使用 Grok
+        const allModels = await this.getGrokModels(apiKey);
+        const customModel = SmartSearchService.getCustomModel(AIProvider.GROK);
+        const models = customModel && allModels.includes(customModel)
+          ? [customModel, ...allModels.filter(m => m !== customModel)]
+          : allModels;
+        
+        let lastError: Error | null = null;
+        
+        for (const modelName of models) {
+          try {
+            const aiResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+              },
+              body: JSON.stringify({
+                model: modelName,
+                messages: [
+                  {
+                    role: 'system',
+                    content: '你是一個智能電台助手。請以 JSON 格式回覆。',
+                  },
+                  {
+                    role: 'user',
+                    content: prompt,
+                  },
+                ],
+                temperature: 0.7,
+              }),
+            });
+
+            if (!aiResponse.ok) {
+              const errorText = await aiResponse.text();
+              throw new Error(`Grok API 錯誤: ${aiResponse.status} - ${errorText.substring(0, 100)}`);
+            }
+
+            const data = await aiResponse.json();
+            response = data.choices[0]?.message?.content || '';
+            console.log(`✅ Grok 分析成功（使用模型: ${modelName}）`);
+            break;
+          } catch (error) {
+            if (modelName === models[models.length - 1]) {
+              throw error;
+            }
+            lastError = error instanceof Error ? error : new Error(String(error));
+            console.log(`⚠️ 模型 ${modelName} 失敗，嘗試下一個模型...`);
+          }
+        }
+        
+        if (lastError && !response) {
+          throw lastError;
+        }
+      } else {
+        throw new Error(`不支持的 AI 提供商: ${provider}`);
+      }
+
+      if (!response) {
+        throw new Error('AI 回應為空');
+      }
       
       // 解析 JSON
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
-        throw new Error('AI 回應格式錯誤');
+        throw new Error('AI 回應格式錯誤：無法找到 JSON');
       }
 
       const analysis = JSON.parse(jsonMatch[0]);
+      
+      // 驗證必要欄位
+      if (!analysis.intent || !analysis.keyword || !analysis.description) {
+        throw new Error('AI 回應格式錯誤：缺少必要欄位');
+      }
+
       return analysis;
     } catch (error) {
       console.error('AI 分析失敗:', error);
-      throw error;
+      // 提供降級策略：使用簡單的關鍵詞提取
+      return this.fallbackAnalysis(command);
+    }
+  }
+
+  /**
+   * 降級策略：簡單的關鍵詞分析
+   */
+  private static fallbackAnalysis(command: string): {
+    intent: string;
+    keyword: string;
+    description: string;
+  } {
+    const lowerCommand = command.toLowerCase();
+    
+    // 關鍵詞映射
+    const keywordMap: { [key: string]: { keyword: string; description: string; intent: string } } = {
+      '新聞': { keyword: 'news', description: '新聞', intent: 'listen_news' },
+      '資訊': { keyword: 'news', description: '資訊', intent: 'listen_news' },
+      '古典': { keyword: 'classical', description: '古典音樂', intent: 'listen_classical' },
+      '音樂': { keyword: 'music', description: '音樂', intent: 'listen_music' },
+      '流行': { keyword: 'pop', description: '流行音樂', intent: 'listen_music' },
+      '爵士': { keyword: 'jazz', description: '爵士樂', intent: 'listen_music' },
+      '搖滾': { keyword: 'rock', description: '搖滾樂', intent: 'listen_music' },
+      '電子': { keyword: 'electronic', description: '電子音樂', intent: 'listen_music' },
+      '日本': { keyword: 'japan', description: '日本電台', intent: 'listen_music' },
+    };
+    
+    for (const [chinese, mapping] of Object.entries(keywordMap)) {
+      if (lowerCommand.includes(chinese)) {
+        return mapping;
+      }
+    }
+    
+    // 預設值
+    return {
+      intent: 'listen_music',
+      keyword: command,
+      description: command,
+    };
+  }
+
+  /**
+   * 獲取 Gemini 可用模型列表
+   */
+  private static async getGeminiModels(apiKey: string): Promise<string[]> {
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+      if (!response.ok) {
+        throw new Error(`無法獲取模型列表: ${response.status}`);
+      }
+      const data = await response.json();
+      const models = data.models
+        ?.filter((m: any) => m.name?.includes('gemini'))
+        ?.map((m: any) => m.name.replace('models/', ''))
+        ?.sort((a: string, b: string) => {
+          // 優先使用最新版本
+          if (a.includes('2.5') && !b.includes('2.5')) return -1;
+          if (!a.includes('2.5') && b.includes('2.5')) return 1;
+          if (a.includes('flash') && !b.includes('flash')) return -1;
+          if (!a.includes('flash') && b.includes('flash')) return 1;
+          return b.localeCompare(a);
+        }) || [];
+      
+      return models.length > 0 ? models : ['gemini-2.5-flash', 'gemini-1.5-flash'];
+    } catch (error) {
+      console.error('獲取 Gemini 模型列表失敗，使用預設模型:', error);
+      return ['gemini-2.5-flash', 'gemini-1.5-flash'];
+    }
+  }
+
+  /**
+   * 獲取 ChatGPT 可用模型列表
+   */
+  private static async getChatGPTModels(apiKey: string): Promise<string[]> {
+    try {
+      const response = await fetch('https://api.openai.com/v1/models', {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`無法獲取模型列表: ${response.status}`);
+      }
+      const data = await response.json();
+      const models = data.data
+        ?.filter((m: any) => m.id?.startsWith('gpt-'))
+        ?.map((m: any) => m.id)
+        ?.sort((a: string, b: string) => {
+          // 優先使用最新版本
+          if (a.includes('4o') && !b.includes('4o')) return -1;
+          if (!a.includes('4o') && b.includes('4o')) return 1;
+          return b.localeCompare(a);
+        }) || [];
+      
+      return models.length > 0 ? models : ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo'];
+    } catch (error) {
+      console.error('獲取 ChatGPT 模型列表失敗，使用預設模型:', error);
+      return ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo'];
+    }
+  }
+
+  /**
+   * 獲取 Grok 可用模型列表
+   */
+  private static async getGrokModels(apiKey: string): Promise<string[]> {
+    try {
+      const response = await fetch('https://api.x.ai/v1/models', {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`無法獲取模型列表: ${response.status}`);
+      }
+      const data = await response.json();
+      const models = data.data
+        ?.filter((m: any) => m.id?.startsWith('grok-'))
+        ?.map((m: any) => m.id)
+        ?.sort((a: string, b: string) => {
+          // 優先使用最新版本
+          if (a.includes('2-latest') && !b.includes('2-latest')) return -1;
+          if (!a.includes('2-latest') && b.includes('2-latest')) return 1;
+          return b.localeCompare(a);
+        }) || [];
+      
+      return models.length > 0 ? models : ['grok-2-latest', 'grok-2', 'grok-beta'];
+    } catch (error) {
+      console.error('獲取 Grok 模型列表失敗，使用預設模型:', error);
+      return ['grok-2-latest', 'grok-2', 'grok-beta'];
     }
   }
 
