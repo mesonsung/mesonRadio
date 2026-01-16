@@ -4,7 +4,7 @@
  */
 
 export const Config = {
-  // Radio Browser API for searching stations
+  // Radio Browser API for searching stations (最新端點)
   RADIO_BROWSER_API: 'https://de1.api.radio-browser.info/json',
   
   // Storage keys
@@ -48,6 +48,19 @@ export const Config = {
     streamRetryInterval: 2000, // 串流重試固定間隔（毫秒）- 每 2 秒一次（更積極）
     enableInfiniteRetry: true, // 啟用無限重試
     bufferingTimeout: 15000, // 緩衝超時時間（15秒，更短以便更快重試）
+  },
+
+  // AI API Keys (預設值，僅在用戶未設置時使用)
+  // 注意：敏感資訊不應硬編碼在代碼中
+  // 預設 API Key 應通過環境變數、.env 文件或運行時配置提供
+  // 用戶應在應用中通過「設定」→「AI 設定」手動配置 API Key
+  // 
+  // 如需設置預設 API Key，請使用環境變數：
+  // - 創建 .env 文件（已在 .gitignore 中）
+  // - 設置 EXPO_PUBLIC_GROK_API_KEY=your-key-here
+  // - 或在 app.config.js 的 extra 中配置
+  AI_API_KEYS: {
+    GROK: (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_GROK_API_KEY) || '', // 從環境變數讀取
   },
 };
 
