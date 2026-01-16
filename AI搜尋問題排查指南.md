@@ -2,9 +2,12 @@
 
 ## 📋 已修復的問題
 
-### 1. ✅ Gemini 模型名稱錯誤
-- **問題**：使用了不存在的 `gemini-2.5-flash` 模型
-- **修復**：改用正確的 `gemini-1.5-flash` 模型
+### 1. ✅ Gemini 模型名稱更新
+- **問題**：使用了舊版本的模型名稱
+- **修復**：更新為最新模型，並實現動態獲取機制
+  - 優先使用 `gemini-2.5-flash`（最新快速模型）
+  - 支援 `gemini-2.5-pro`（最新高級模型）
+  - 保留 `gemini-1.5-flash` 作為穩定備用
 
 ### 2. ✅ 缺乏降級策略
 - **問題**：AI 失敗後沒有好的備用方案
@@ -23,6 +26,43 @@
 ### 4. ✅ 添加詳細日誌
 - **問題**：無法知道哪一步失敗
 - **修復**：添加了完整的調試日誌，可以追蹤整個搜尋流程
+
+### 5. ✅ xAI/Grok 模型名稱和錯誤處理
+- **問題**：使用了錯誤的模型名稱 `grok-beta`，且錯誤處理不完善
+- **修復**：
+  - 更新模型名稱為 `grok-2-latest`（最新版本）
+  - 添加模型名稱降級策略（自動嘗試 `grok-2-latest` → `grok-2` → `grok-beta`）
+  - 改進錯誤處理，提供更詳細的錯誤訊息
+  - 添加完整的日誌輸出，方便排查問題
+
+### 6. ✅ 動態獲取所有 AI 提供商的可用模型
+- **問題**：硬編碼模型名稱，無法適應 API 的變化
+- **修復**：
+  - **Gemini**：從 `GET /v1beta/models` 獲取可用模型列表
+  - **ChatGPT**：從 `GET /v1/models` 獲取可用模型列表
+  - **Grok**：從 `GET /v1/models` 獲取可用模型列表
+  - 添加模型列表快取機制（24 小時有效期）
+  - 支援多種 API 回應格式（OpenAI 格式、直接數組等）
+  - 如果 API 獲取失敗，自動回退到預設模型列表
+  - **智能模型排序**：自動識別並優先使用最新版本（gemini-3 > gemini-2.5 > gemini-2 > gemini-1.5）
+  - 模型不可用時自動嘗試下一個模型（降級策略）
+
+### 7. ✅ 更新為最新 AI 模型（2025年）
+- **更新內容**：
+  - **Gemini**：更新預設模型為 `gemini-3-pro` 和 `gemini-3-flash`（2025年最新版本）
+  - **ChatGPT**：更新預設模型為 `gpt-5` 和 `gpt-5-mini`（2025年最新版本）
+  - **Grok**：更新預設模型為 `grok-4` 和 `grok-4-fast`（2025年最新版本）
+  - 改進模型排序邏輯，自動識別並優先使用最新版本
+  - 支援 GPT-5 系列、Gemini 3 系列、Grok 4 系列的識別和排序
+  - 支援推理模型（o3, o4-mini）的識別和排序
+
+### 8. ✅ 用戶自定義模型選擇
+- **新功能**：
+  - 用戶可以在 AI 設定頁面選擇要使用的具體模型
+  - 支援從 API 動態獲取可用模型列表
+  - 可以選擇「自動選擇」讓系統自動使用最新版本
+  - 自定義模型會優先使用，失敗時自動降級到其他可用模型
+  - 每個 AI 提供商可以獨立設定模型
 
 ## 🔧 如何測試修復
 
@@ -114,13 +154,21 @@ adb logcat | grep -E "🔍|✅|⚠️|❌"
 
 查看日誌：
 ```bash
+# Gemini
 adb logcat | grep "Gemini API"
+
+# ChatGPT
+adb logcat | grep "ChatGPT API"
+
+# Grok (xAI)
+adb logcat | grep "Grok API"
 ```
 
 如果看到錯誤，檢查：
 - API Key 是否正確
 - 網路連接是否正常
 - API 配額是否用完
+- **對於 Grok**：確認 API Key 是否有效，模型是否可用
 
 **可能原因 2**：推薦的電台不存在
 
@@ -147,6 +195,46 @@ adb logcat | grep "Radio Browser"
 **解決方法**：
 1. 使用更具體的查詢（例如：「BBC 新聞」而不是「新聞」）
 2. 如果持續問題，可能需要調整 AI 提示詞
+
+### 問題 4：xAI/Grok 無法使用
+
+**可能原因 1**：模型名稱錯誤
+
+**解決方法**：
+- 系統會自動嘗試多個模型名稱（`grok-2-latest` → `grok-2` → `grok-beta`）
+- 如果所有模型都失敗，檢查日誌查看具體錯誤訊息
+
+**可能原因 2**：API Key 無效或過期
+
+**解決方法**：
+1. 前往 https://console.x.ai 確認 API Key 是否有效
+2. 檢查 API Key 是否有足夠的配額
+3. 確認帳號是否有權限使用 Grok API
+
+**可能原因 3**：API 端點或網路問題
+
+**解決方法**：
+1. 確認網路連接正常
+2. 檢查是否有防火牆或 VPN 阻擋
+3. 查看日誌中的詳細錯誤訊息
+
+**查看 Grok 相關日誌**：
+```bash
+adb logcat | grep -E "Grok|grok"
+```
+
+你會看到類似以下的日誌：
+```
+🔍 使用 Grok API 搜尋電台（模型: grok-2-latest）...
+✅ Grok API 回應成功（使用模型: grok-2-latest）
+```
+
+如果看到模型切換的訊息：
+```
+⚠️ 模型 grok-2-latest 不可用，嘗試下一個模型...
+🔍 使用 Grok API 搜尋電台（模型: grok-2）...
+✅ Grok API 回應成功（使用模型: grok-2）
+```
 
 ## 📊 性能優化
 
@@ -236,6 +324,102 @@ adb logcat | grep "Radio Browser"
 4. ✅ 添加了詳細日誌
 5. ✅ 選擇最佳電台
 6. ✅ 智能關鍵詞提取
+7. ✅ 修復 xAI/Grok 模型名稱問題
+8. ✅ 添加所有 AI 提供商的模型降級策略
+9. ✅ 改進所有 AI 提供商的錯誤處理
+10. ✅ 實現動態獲取所有 AI 提供商的可用模型列表
+11. ✅ 添加模型列表快取機制（24 小時有效期）
+12. ✅ 自動模型切換（模型不可用時自動嘗試下一個）
+13. ✅ 更新為最新 AI 模型（2025年版本）
+14. ✅ 智能模型排序（優先使用最新版本）
+15. ✅ 用戶自定義模型選擇功能
 
 **即使 AI 完全失敗，也能通過關鍵詞或直接搜尋找到電台！**
 
+### 所有 AI 提供商的動態模型獲取
+
+所有 AI 提供商（Gemini、ChatGPT、Grok）現在都支援動態獲取可用模型：
+
+- **動態模型獲取**：系統會自動從 API 獲取可用模型列表，無需手動更新
+- **智能快取**：模型列表會快取 24 小時，減少 API 調用
+- **模型自動切換**：如果某個模型不可用，自動嘗試下一個可用模型
+- **詳細錯誤訊息**：提供清晰的錯誤訊息，方便排查問題
+- **完整日誌**：記錄每個步驟，包括使用的模型名稱和獲取過程
+
+#### 模型獲取流程（適用於所有 AI 提供商）
+
+```
+1. 檢查記憶體快取 → 有則直接使用
+2. 檢查本地快取（24小時內）→ 有則使用並更新記憶體快取
+3. 從 API 獲取模型列表 → 成功則保存快取
+4. 如果都失敗 → 使用預設模型列表
+5. 嘗試使用模型 → 失敗則嘗試下一個模型
+```
+
+#### API 端點
+
+- **Gemini**：`GET https://generativelanguage.googleapis.com/v1beta/models?key={apiKey}`
+- **ChatGPT**：`GET https://api.openai.com/v1/models`
+- **Grok**：`GET https://api.x.ai/v1/models`
+
+#### 預設模型列表（降級使用，已更新為最新版本）
+
+- **Gemini**（已更新 2025年）：
+  - `gemini-3-pro` - 最新 Gemini 3 系列
+  - `gemini-3-flash` - Gemini 3 快速版
+  - `gemini-2.5-flash` - Gemini 2.5 快速模型
+  - `gemini-2.5-pro` - Gemini 2.5 高級模型
+  - `gemini-1.5-flash` - 穩定快速模型
+  - `gemini-1.5-pro` - 穩定高級模型
+  - `gemini-pro` - 舊版備用
+
+- **ChatGPT**（已更新 2025年）：
+  - `gpt-5` - 最新 GPT-5 系列
+  - `gpt-5-mini` - GPT-5 輕量版
+  - `gpt-4o` - GPT-4o 系列
+  - `gpt-4o-mini` - GPT-4o 輕量版本
+  - `gpt-4-turbo` - GPT-4 Turbo
+  - `gpt-4` - GPT-4 標準版
+  - `gpt-3.5-turbo` - 舊版備用
+
+- **Grok**（已更新 2025年）：
+  - `grok-4` - 最新 Grok 4 系列
+  - `grok-4-fast` - Grok 4 快速版
+  - `grok-3` - Grok 3 系列
+  - `grok-3-mini` - Grok 3 輕量版
+  - `grok-2-1212` - Grok 2 最新版本
+  - `grok-2-latest` - Grok 2 最新版
+  - `grok-2` - Grok 2 標準版
+  - `grok-beta` - 舊版備用
+
+**注意**：系統會自動從 API 獲取最新可用模型，上述列表僅作為降級備用。
+
+#### 清除快取
+
+如果需要強制刷新模型列表，可以調用：
+```typescript
+// 清除所有提供商的快取
+await SmartSearchService.clearModelsCache();
+
+// 清除特定提供商的快取
+await SmartSearchService.clearModelsCache(AIProvider.GEMINI);
+await SmartSearchService.clearModelsCache(AIProvider.CHATGPT);
+await SmartSearchService.clearModelsCache(AIProvider.GROK);
+```
+
+#### 自定義模型選擇
+
+用戶可以在 AI 設定頁面選擇要使用的具體模型：
+
+1. **進入設定**：設定 → AI 設定
+2. **選擇提供商**：選擇已配置 API Key 的 AI 提供商
+3. **選擇模型**：
+   - 點擊「選擇 AI 模型」下拉選單
+   - 選擇「自動選擇（推薦最新版本）」或具體模型名稱
+   - 系統會自動保存選擇
+4. **清除選擇**：點擊「清除自定義模型」恢復為自動選擇
+
+**注意**：
+- 自定義模型會優先使用，如果該模型不可用，會自動降級到其他可用模型
+- 每個 AI 提供商可以獨立設定模型
+- 如果沒有選擇模型，系統會自動使用最新可用版本

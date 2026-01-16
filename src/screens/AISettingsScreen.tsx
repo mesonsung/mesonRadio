@@ -62,6 +62,10 @@ export const AISettingsScreen: React.FC = () => {
   const [tempApiKey, setTempApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>('');
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [showModelPicker, setShowModelPicker] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -79,6 +83,44 @@ export const AISettingsScreen: React.FC = () => {
       if (key) keys.set(p, key);
     }
     setApiKeys(keys);
+
+    // 載入當前提供商的模型設定
+    await loadModelsForProvider(provider);
+  };
+
+  const loadModelsForProvider = async (provider: AIProvider) => {
+    const apiKey = SmartSearchService.getAPIKey(provider);
+    if (!apiKey) {
+      setAvailableModels([]);
+      setSelectedModel('');
+      return;
+    }
+
+    setIsLoadingModels(true);
+    try {
+      let models: string[] = [];
+      switch (provider) {
+        case AIProvider.GEMINI:
+          models = await SmartSearchService.getAvailableGeminiModels(apiKey);
+          break;
+        case AIProvider.CHATGPT:
+          models = await SmartSearchService.getAvailableChatGPTModels(apiKey);
+          break;
+        case AIProvider.GROK:
+          models = await SmartSearchService.getAvailableGrokModels(apiKey);
+          break;
+      }
+      setAvailableModels(models);
+
+      // 載入用戶選擇的模型
+      const customModel = SmartSearchService.getCustomModel(provider);
+      setSelectedModel(customModel || '');
+    } catch (error) {
+      console.error('載入模型列表失敗:', error);
+      setAvailableModels([]);
+    } finally {
+      setIsLoadingModels(false);
+    }
   };
 
   const handleProviderChange = async (provider: AIProvider) => {
@@ -86,6 +128,47 @@ export const AISettingsScreen: React.FC = () => {
     await SmartSearchService.setAIProvider(provider);
     setTempApiKey('');
     setShowApiKey(false);
+    await loadModelsForProvider(provider);
+  };
+
+  const handleModelSelect = async (modelName: string) => {
+    try {
+      if (modelName) {
+        await SmartSearchService.setCustomModel(currentProvider, modelName);
+        setSelectedModel(modelName);
+        Alert.alert('成功', `已設置使用模型：${modelName}`);
+      } else {
+        await SmartSearchService.clearCustomModel(currentProvider);
+        setSelectedModel('');
+        Alert.alert('成功', '已恢復為自動選擇模型');
+      }
+      setShowModelPicker(false);
+    } catch (error) {
+      Alert.alert('錯誤', '設置模型失敗，請重試');
+    }
+  };
+
+  const handleClearModel = async () => {
+    Alert.alert(
+      '確認',
+      '確定要清除自定義模型設定嗎？將恢復為自動選擇。',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '確定',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await SmartSearchService.clearCustomModel(currentProvider);
+              setSelectedModel('');
+              Alert.alert('成功', '已清除自定義模型設定');
+            } catch (error) {
+              Alert.alert('錯誤', '清除失敗');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleSave = async () => {
@@ -103,6 +186,9 @@ export const AISettingsScreen: React.FC = () => {
       newKeys.set(currentProvider, tempApiKey.trim());
       setApiKeys(newKeys);
       setTempApiKey('');
+      
+      // 重新載入模型列表
+      await loadModelsForProvider(currentProvider);
       
       Alert.alert('成功', `${PROVIDERS[currentProvider].name} API Key 已保存！`);
     } catch (error) {
@@ -246,6 +332,101 @@ export const AISettingsScreen: React.FC = () => {
             前往 {PROVIDERS[currentProvider].name} 獲取 API Key
           </Text>
         </TouchableOpacity>
+
+        {/* 模型選擇 */}
+        {isProviderConfigured(currentProvider) && (
+          <View style={styles.modelSection}>
+            <Text style={styles.modelSectionTitle}>選擇 AI 模型</Text>
+            <Text style={styles.modelSectionDescription}>
+              選擇要使用的具體模型，或留空使用自動選擇（推薦最新版本）
+            </Text>
+            
+            {isLoadingModels ? (
+              <View style={styles.modelLoadingContainer}>
+                <Text style={styles.modelLoadingText}>載入模型列表中...</Text>
+              </View>
+            ) : availableModels.length > 0 ? (
+              <>
+                <TouchableOpacity
+                  style={styles.modelSelector}
+                  onPress={() => setShowModelPicker(!showModelPicker)}
+                >
+                  <View style={styles.modelSelectorContent}>
+                    <Ionicons name="cube" size={IconSizes.md} color={Colors.primary} />
+                    <Text style={styles.modelSelectorText}>
+                      {selectedModel || '自動選擇（推薦最新版本）'}
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name={showModelPicker ? 'chevron-up' : 'chevron-down'}
+                    size={IconSizes.md}
+                    color={Colors.textSecondary}
+                  />
+                </TouchableOpacity>
+
+                {showModelPicker && (
+                  <View style={styles.modelListContainer}>
+                    <ScrollView style={styles.modelList} nestedScrollEnabled>
+                      <TouchableOpacity
+                        style={[
+                          styles.modelItem,
+                          !selectedModel && styles.modelItemSelected,
+                        ]}
+                        onPress={() => handleModelSelect('')}
+                      >
+                        <Text style={[
+                          styles.modelItemText,
+                          !selectedModel && styles.modelItemTextSelected,
+                        ]}>
+                          自動選擇（推薦最新版本）
+                        </Text>
+                        {!selectedModel && (
+                          <Ionicons name="checkmark" size={IconSizes.sm} color={Colors.primary} />
+                        )}
+                      </TouchableOpacity>
+                      {availableModels.map((model) => (
+                        <TouchableOpacity
+                          key={model}
+                          style={[
+                            styles.modelItem,
+                            selectedModel === model && styles.modelItemSelected,
+                          ]}
+                          onPress={() => handleModelSelect(model)}
+                        >
+                          <Text style={[
+                            styles.modelItemText,
+                            selectedModel === model && styles.modelItemTextSelected,
+                          ]}>
+                            {model}
+                          </Text>
+                          {selectedModel === model && (
+                            <Ionicons name="checkmark" size={IconSizes.sm} color={Colors.primary} />
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+
+                {selectedModel && (
+                  <TouchableOpacity
+                    style={styles.clearModelButton}
+                    onPress={handleClearModel}
+                  >
+                    <Ionicons name="close-circle" size={IconSizes.sm} color={Colors.error} />
+                    <Text style={styles.clearModelButtonText}>清除自定義模型</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            ) : (
+              <View style={styles.modelEmptyContainer}>
+                <Text style={styles.modelEmptyText}>
+                  無法載入模型列表，將使用預設模型
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
 
         <View style={styles.buttonRow}>
           <TouchableOpacity
@@ -581,5 +762,102 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.text,
     lineHeight: 20,
+  },
+  modelSection: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: Colors.background,
+  },
+  modelSectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.text,
+    marginBottom: 4,
+  },
+  modelSectionDescription: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginBottom: 12,
+    lineHeight: 16,
+  },
+  modelLoadingContainer: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  modelLoadingText: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  modelSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.surface,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+  },
+  modelSelectorContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  modelSelectorText: {
+    fontSize: 14,
+    color: Colors.text,
+    marginLeft: 8,
+    flex: 1,
+  },
+  modelListContainer: {
+    backgroundColor: Colors.surface,
+    borderRadius: 8,
+    maxHeight: 200,
+    marginBottom: 8,
+  },
+  modelList: {
+    maxHeight: 200,
+  },
+  modelItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.background,
+  },
+  modelItemSelected: {
+    backgroundColor: 'rgba(33, 150, 243, 0.1)',
+  },
+  modelItemText: {
+    fontSize: 13,
+    color: Colors.text,
+    flex: 1,
+  },
+  modelItemTextSelected: {
+    color: Colors.primary,
+    fontWeight: '600',
+  },
+  clearModelButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+    marginTop: 4,
+  },
+  clearModelButtonText: {
+    fontSize: 12,
+    color: Colors.error,
+    marginLeft: 4,
+  },
+  modelEmptyContainer: {
+    padding: 12,
+    backgroundColor: Colors.surface,
+    borderRadius: 8,
+  },
+  modelEmptyText: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    textAlign: 'center',
   },
 });
